@@ -1,7 +1,8 @@
+import AppLayout from "@/components/layout/app-layout";
 
 
 export default function Home() {
   return (
-    <h1>next with tailwind</h1>
+    <AppLayout/>
   );
 }
