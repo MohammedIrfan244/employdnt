@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Employdnt - Personal Job Search Assistant",
-  description: "Track your job applications and daily goals effortlessly",
+  title: "Employdnt",
+  description: "I got you bruv",
 };
 
 export default function RootLayout({

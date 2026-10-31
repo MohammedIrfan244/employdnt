@@ -13,7 +13,6 @@ export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 export const DEFAULT_CATEGORIES = [
   { name: "Development", defaultTarget: 10 },
   { name: "Other Remote Jobs", defaultTarget: 10 },
-  { name: "Freelance", defaultTarget: 10 },
 ] as const;
 
 export const DEFAULT_GOAL_MILESTONES = [10, 15, 20, 30, 40, 50] as const;

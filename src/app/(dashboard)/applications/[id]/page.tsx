@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import ApplicationDetail from "@/components/pages/applications/application-detail";
 
 interface ApplicationDetailPageProps {
   params: Promise<{ id: string }>;
@@ -6,17 +7,12 @@ interface ApplicationDetailPageProps {
 
 async function ApplicationContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Application Details</h1>
-      <p className="text-zinc-600">Application ID: {id}</p>
-    </div>
-  );
+  return <ApplicationDetail id={id} />;
 }
 
 export default function ApplicationDetailPage({ params }: ApplicationDetailPageProps) {
   return (
-    <Suspense fallback={<div className="p-4 text-zinc-500">Loading application details...</div>}>
+    <Suspense fallback={<div className="p-8 text-xs text-zinc-400 text-center animate-pulse">Loading application...</div>}>
       <ApplicationContent params={params} />
     </Suspense>
   );
