@@ -1,8 +1,10 @@
+import { Suspense } from "react";
+
 interface ApplicationDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function ApplicationDetailPage({ params }: ApplicationDetailPageProps) {
+async function ApplicationContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return (
     <div className="space-y-4">
@@ -12,3 +14,10 @@ export default async function ApplicationDetailPage({ params }: ApplicationDetai
   );
 }
 
+export default function ApplicationDetailPage({ params }: ApplicationDetailPageProps) {
+  return (
+    <Suspense fallback={<div className="p-4 text-zinc-500">Loading application details...</div>}>
+      <ApplicationContent params={params} />
+    </Suspense>
+  );
+}

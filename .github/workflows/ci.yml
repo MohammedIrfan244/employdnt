@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
+    # Runs CI checks on every push across all branches (feature branches, beta, main)
     branches:
-      - main
-      - beta
+      - "**"
   pull_request:
     branches:
       - main
@@ -38,4 +38,3 @@ jobs:
         run: npm run build
         env:
           MONGODB_URI: "mongodb://127.0.0.1:27017/ci_test"
-
