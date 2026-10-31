@@ -1,8 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Strictly Dark Theme: Crafted, Deep Slate & Obsidian */
+  --background: #0b0d10;
+  --foreground: #f1f3f7;
+  --surface: #13161c;
+  --surface-hover: #1a1e27;
+  --surface-elevated: #1f232e;
+  --border: #222733;
+  --border-light: #191c24;
+  --muted: #848b99;
+  --muted-light: #4b5260;
+
+  /* Natural Forest Green Glow */
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-text: #34d399;
+  --accent-light: rgba(16, 185, 129, 0.12);
+  --accent-border: rgba(16, 185, 129, 0.28);
+
+  /* Status Indicators for Dark Mode */
+  --status-applied-bg: rgba(16, 185, 129, 0.12);
+  --status-applied-text: #34d399;
+  --status-applied-border: rgba(16, 185, 129, 0.3);
+
+  --status-followup-bg: rgba(245, 158, 11, 0.12);
+  --status-followup-text: #fbbf24;
+  --status-followup-border: rgba(245, 158, 11, 0.3);
+
+  --status-progress-bg: rgba(59, 130, 246, 0.12);
+  --status-progress-text: #60a5fa;
+  --status-progress-border: rgba(59, 130, 246, 0.3);
+
+  --status-offer-bg: rgba(16, 185, 129, 0.2);
+  --status-offer-text: #6ee7b7;
+  --status-offer-border: rgba(16, 185, 129, 0.45);
+
+  --status-rejected-bg: rgba(107, 114, 128, 0.15);
+  --status-rejected-text: #9ca3af;
+  --status-rejected-border: rgba(107, 114, 128, 0.3);
 }
 
 @theme inline {
@@ -12,15 +48,26 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-light);
 }

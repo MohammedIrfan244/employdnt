@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useClientDate } from "@/hooks/use-client-date";
-import QuickAddModal from "@/components/shared/quick-add-modal";
+import Card from "@/components/ui/card";
+import Button from "@/components/ui/button";
+import Badge, { getStatusBadgeVariant } from "@/components/ui/badge";
 import { ICategory } from "@/types/category";
 import { IDailyProgress } from "@/types/daily-progress";
 import { IApplication } from "@/types/application";
@@ -20,7 +22,6 @@ export default function Today() {
   const [needsAttention, setNeedsAttention] = useState<IApplication[]>([]);
   const [recentApplications, setRecentApplications] = useState<IApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     if (!todayString) return;
@@ -29,7 +30,7 @@ export default function Today() {
       const [progRes, attnRes, recentRes] = await Promise.all([
         fetch(`/api/progress/today?clientDate=${encodeURIComponent(todayString)}`),
         fetch("/api/follow-up"),
-        fetch("/api/applications?recent=true&limit=5"),
+        fetch("/api/applications?recent=true&limit=8"),
       ]);
 
       const [progData, attnData, recentData] = await Promise.all([
@@ -48,7 +49,7 @@ export default function Today() {
         setRecentApplications(recentData.data || []);
       }
     } catch {
-      // Graceful error fallback
+      // silent
     } finally {
       setLoading(false);
     }
@@ -60,204 +61,222 @@ export default function Today() {
     }
   }, [isClient, todayString, fetchDashboardData]);
 
+  const totalLifetime = categoriesProgress.reduce(
+    (acc, curr) => acc + (curr.category.lifetimeCount || 0),
+    0
+  );
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      {/* Header with Greeting & Quick Add Button (Module 1.6) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-100">
+    <div className="space-y-8">
+      {/* Serene Header */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Today</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            {isClient ? formatDate(new Date(), { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Today's Overview"}
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Today</h1>
+          <p className="text-sm text-[var(--muted)] mt-0.5">
+            {isClient
+              ? formatDate(new Date(), { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+              : "Welcome back"}
           </p>
         </div>
 
-        <div>
-          <button
-            type="button"
-            onClick={() => setIsQuickAddOpen(true)}
-            className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5"
-          >
-            <span className="text-sm leading-none">+</span> Add Application
-          </button>
+        <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
+          <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span>Tracking {categoriesProgress.length} categories</span>
         </div>
       </div>
 
-      {/* Module 1.1 & 1.2: Daily Application Goals (Progressive Goal System) */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">Daily Progress</h2>
-          <span className="text-xs text-zinc-400">Resets daily</span>
-        </div>
+      {/* Fluid Multi-Column Layout - Perfectly Proportioned Across Ultrawide Monitors */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left / Center Area: Daily Rhythm & Recent Logs (8 cols on lg, 8 on xl, 9 on 2xl) */}
+        <div className="lg:col-span-8 2xl:col-span-9 space-y-6">
+          {/* Daily Goals / Rhythm */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">Daily rhythm</h2>
+              <span className="text-xs text-[var(--muted)]">Milestones advance automatically</span>
+            </div>
 
-        {loading ? (
-          <div className="p-8 border border-zinc-100 rounded-xl bg-zinc-50 text-center text-xs text-zinc-400 animate-pulse">
-            Loading your progress...
-          </div>
-        ) : categoriesProgress.length === 0 ? (
-          <div className="p-6 border border-zinc-100 rounded-xl bg-white text-center text-xs text-zinc-500">
-            No active categories found. Add your first application to initialize categories!
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {categoriesProgress.map(({ category, progress }) => {
-              const count = progress.count || 0;
-              const target = progress.currentMilestone || category.defaultTarget || 10;
-              const percentage = Math.min(Math.round((count / target) * 100), 100);
-              const reachedInitial = count >= (category.defaultTarget || 10);
-
-              return (
-                <div
-                  key={category._id?.toString()}
-                  className="p-5 bg-white border border-zinc-200/80 rounded-xl shadow-xs space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-900">{category.name}</h3>
-                      <p className="text-[11px] text-zinc-400">
-                        Lifetime: <span className="font-medium text-zinc-600">{category.lifetimeCount || 0}</span> applications
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-sm font-bold text-emerald-700">
-                        {count} <span className="text-zinc-400 font-normal">/ {target}</span>
-                      </span>
-                      {reachedInitial && (
-                        <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">
-                          Goal Reached!
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Progress Bar (Module 1.1) */}
-                  <div className="w-full bg-zinc-100 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className={`h-2.5 rounded-full transition-all duration-500 ${
-                        reachedInitial ? "bg-emerald-600" : "bg-emerald-500"
-                      }`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Module 1.4: Needs Attention */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">Needs Attention</h2>
-          {needsAttention.length > 0 && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60">
-              {needsAttention.length} due
-            </span>
-          )}
-        </div>
-
-        {needsAttention.length === 0 ? (
-          <div className="p-4 rounded-xl border border-dashed border-zinc-200 bg-white text-center text-xs text-zinc-400">
-            No follow-ups due today. You are all caught up!
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {needsAttention.map((app) => (
-              <div
-                key={app._id?.toString()}
-                className="p-3.5 bg-amber-50/40 border border-amber-200/60 rounded-xl flex items-center justify-between gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-zinc-900">{app.company}</span>
-                    <span className="text-xs text-zinc-500">• {app.role}</span>
-                  </div>
-                  <p className="text-[11px] text-amber-700 mt-0.5">
-                    Follow-up reminder due • Applied on {formatDate(app.appliedDate)}
-                  </p>
-                </div>
-
-                <Link
-                  href={`/applications/${app._id}`}
-                  className="px-3 py-1 text-xs font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors whitespace-nowrap"
-                >
-                  Review
-                </Link>
+            {loading ? (
+              <div className="p-8 rounded-2xl bg-[var(--surface)] border border-[var(--border)] text-center text-xs text-[var(--muted)] animate-pulse">
+                Fetching today&apos;s counts...
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            ) : categoriesProgress.length === 0 ? (
+              <Card className="text-center py-8">
+                <p className="text-sm text-[var(--muted)]">No active categories yet.</p>
+                <p className="text-xs text-[var(--muted-light)] mt-1">
+                  Click &quot;+ Log application&quot; above to get started.
+                </p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
+                {categoriesProgress.map(({ category, progress }) => {
+                  const count = progress.count || 0;
+                  const target = progress.currentMilestone || category.defaultTarget || 10;
+                  const percentage = Math.min(Math.round((count / target) * 100), 100);
+                  const reachedInitial = count >= (category.defaultTarget || 10);
 
-      {/* Module 1.5: Recent Applications */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">Recent Applications</h2>
-          <Link
-            href="/applications"
-            className="text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
-          >
-            View all →
-          </Link>
+                  return (
+                    <Card key={category._id?.toString()} hover className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-semibold text-sm text-[var(--foreground)]">
+                            {category.name}
+                          </h3>
+                          <p className="text-xs text-[var(--muted)] mt-0.5">
+                            {category.lifetimeCount || 0} applications logged
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-[var(--accent-text)]">
+                            {count}{" "}
+                            <span className="text-[var(--muted)] font-normal text-xs">/ {target}</span>
+                          </div>
+                          {reachedInitial && (
+                            <span className="text-[10px] font-semibold text-[var(--accent-text)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded-full border border-[var(--accent-border)]">
+                              Target reached
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tactile progress bar */}
+                      <div className="w-full bg-[var(--surface-hover)] border border-[var(--border)] rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-all duration-500 ease-out shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Applications Feed */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">Recent logs</h2>
+              <Link
+                href="/applications"
+                className="text-xs font-medium text-[var(--accent-text)] hover:underline"
+              >
+                View all applications →
+              </Link>
+            </div>
+
+            {recentApplications.length === 0 ? (
+              <Card className="text-center py-12 space-y-2">
+                <p className="text-sm font-medium text-[var(--foreground)]">No applications logged yet</p>
+                <p className="text-xs text-[var(--muted)]">
+                  Use the &quot;+ Log application&quot; button above to log your first job submission.
+                </p>
+              </Card>
+            ) : (
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl divide-y divide-[var(--border)] overflow-hidden shadow-xs">
+                {recentApplications.map((app) => {
+                  const catName =
+                    typeof app.categoryId === "object" && app.categoryId !== null && "name" in app.categoryId
+                      ? (app.categoryId as { name: string }).name
+                      : "General";
+
+                  return (
+                    <div
+                      key={app._id?.toString()}
+                      className="p-4 flex items-center justify-between hover:bg-[var(--surface-hover)] transition-colors"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/applications/${app._id}`}
+                            className="text-sm font-semibold text-[var(--foreground)] hover:text-[var(--accent-text)] transition-colors"
+                          >
+                            {app.company}
+                          </Link>
+                          <span className="text-xs text-[var(--muted)]">• {app.role}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-[var(--surface-hover)] border border-[var(--border)]">
+                            {catName}
+                          </span>
+                          <span>{formatDate(app.appliedDate)}</span>
+                          {app.salary && <span>• {app.salary}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Badge variant={getStatusBadgeVariant(app.status)}>
+                          {app.status}
+                        </Badge>
+                        <Link
+                          href={`/applications/${app._id}`}
+                          className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                        >
+                          Details →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {recentApplications.length === 0 ? (
-          <div className="p-4 rounded-xl border border-zinc-100 bg-white text-center text-xs text-zinc-400">
-            No applications recorded yet. Click &quot;Add Application&quot; above to log your first job submission.
-          </div>
-        ) : (
-          <div className="bg-white border border-zinc-200/80 rounded-xl divide-y divide-zinc-100 overflow-hidden shadow-xs">
-            {recentApplications.map((app) => {
-              const catName =
-                typeof app.categoryId === "object" && app.categoryId !== null && "name" in app.categoryId
-                  ? (app.categoryId as { name: string }).name
-                  : "General";
+        {/* Right Area: Follow-ups due + Journey Summary (4 cols on lg, 4 on xl, 3 on 2xl) */}
+        <div className="lg:col-span-4 2xl:col-span-3 space-y-5">
+          {/* Follow-up attention card */}
+          <Card className="space-y-3.5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">Follow-ups due</h2>
+              {needsAttention.length > 0 && (
+                <Badge variant="followup">{needsAttention.length} pending</Badge>
+              )}
+            </div>
 
-              return (
-                <div
-                  key={app._id?.toString()}
-                  className="p-3.5 flex items-center justify-between hover:bg-zinc-50/60 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-900">{app.company}</span>
-                      <span className="text-xs text-zinc-500">• {app.role}</span>
+            {needsAttention.length === 0 ? (
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                No reminders due today. You are completely caught up!
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {needsAttention.map((app) => (
+                  <div
+                    key={app._id?.toString()}
+                    className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[var(--foreground)] truncate">
+                        {app.company}
+                      </p>
+                      <p className="text-[11px] text-[var(--muted)] truncate">{app.role}</p>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-100 text-zinc-600">
-                        {catName}
-                      </span>
-                      <span className="text-[11px] text-zinc-400">{formatDate(app.appliedDate)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                      {app.status}
-                    </span>
-                    <Link
-                      href={`/applications/${app._id}`}
-                      className="text-xs text-zinc-400 hover:text-zinc-600"
-                    >
-                      Details →
+                    <Link href={`/applications/${app._id}`}>
+                      <Button variant="secondary" size="sm">
+                        Review
+                      </Button>
                     </Link>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                ))}
+              </div>
+            )}
+          </Card>
 
-      {/* Quick Add Modal */}
-      <QuickAddModal
-        isOpen={isQuickAddOpen}
-        onClose={() => setIsQuickAddOpen(false)}
-        onSuccess={() => {
-          fetchDashboardData();
-        }}
-      />
+          {/* Quiet Journey Card */}
+          <Card className="space-y-3 bg-[var(--accent-light)] border-[var(--accent-border)]">
+            <h3 className="text-xs font-semibold text-[var(--accent-text)] uppercase tracking-wider">
+              Your Journey
+            </h3>
+            <div className="text-2xl font-bold text-[var(--foreground)]">
+              {totalLifetime} <span className="text-xs font-normal text-[var(--muted)]">lifetime applications</span>
+            </div>
+            <p className="text-xs text-[var(--muted)] leading-relaxed">
+              No rejection statistics. No pressure dials. Just steady, quiet consistency on your own terms.
+            </p>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

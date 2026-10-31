@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useClientDate } from "@/hooks/use-client-date";
-import { APPLICATION_STATUSES, ApplicationStatus } from "@/lib/constants";
+import Button from "@/components/ui/button";
+import Card from "@/components/ui/card";
+import Textarea from "@/components/ui/textarea";
+import StatusSelect from "@/components/ui/status-select";
+import ConfirmModal from "@/components/ui/confirm-modal";
+import { ApplicationStatus } from "@/lib/constants";
 import { IApplication } from "@/types/application";
 import { IApplicationEvent } from "@/types/application-event";
 
@@ -23,6 +28,7 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
   const [notesValue, setNotesValue] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -56,7 +62,7 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
       const json = await res.json();
       if (json.success) {
         setApplication((prev) => (prev ? { ...prev, status: newStatus } : prev));
-        loadData(); // Reload timeline
+        loadData();
       }
     } catch {
       // silent
@@ -83,9 +89,7 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this application?")) return;
-
+  const handleDeleteConfirm = async () => {
     setDeleting(true);
     try {
       const res = await fetch(`/api/applications/${id}`, {
@@ -97,12 +101,13 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
       }
     } catch {
       setDeleting(false);
+      setIsDeleteModalOpen(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="p-12 border border-zinc-100 rounded-xl bg-zinc-50 text-center text-xs text-zinc-400 animate-pulse">
+      <div className="p-12 rounded-2xl bg-[var(--surface)] border border-[var(--border)] text-center text-xs text-[var(--muted)] animate-pulse">
         Loading application details...
       </div>
     );
@@ -110,12 +115,12 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
 
   if (!application) {
     return (
-      <div className="p-12 rounded-xl border border-dashed border-zinc-200 bg-white text-center space-y-3">
-        <p className="text-sm font-semibold text-zinc-800">Application not found</p>
-        <Link href="/applications" className="text-xs text-emerald-700 hover:underline">
-          ← Back to all applications
+      <Card className="text-center py-12 space-y-3">
+        <p className="text-sm font-semibold text-[var(--foreground)]">Application not found</p>
+        <Link href="/applications" className="text-xs text-[var(--accent-text)] hover:underline">
+          ← Back to applications
         </Link>
-      </div>
+      </Card>
     );
   }
 
@@ -125,176 +130,209 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
       : "General";
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Top back navigation & actions */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 w-full">
+      {/* Top back navigation */}
+      <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
         <Link
           href="/applications"
-          className="text-xs font-medium text-zinc-500 hover:text-zinc-800 flex items-center gap-1"
+          className="text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 transition-colors"
         >
-          ← Back to applications
+          <span>←</span> Back to applications
         </Link>
 
-        <button
+        <Button
           type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-xs font-medium text-red-600 hover:text-red-700 px-3 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+          variant="danger"
+          size="sm"
+          onClick={() => setIsDeleteModalOpen(true)}
         >
-          {deleting ? "Deleting..." : "Delete Application"}
-        </button>
+          Remove Application
+        </Button>
       </div>
 
-      {/* Main Card */}
-      <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-xs space-y-6">
-        {/* Header section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-zinc-100 text-zinc-700">
-                {catName}
-              </span>
-              <span className="text-xs text-zinc-400">
-                Applied on {formatDate(application.appliedDate)}
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mt-1">{application.company}</h1>
-            <p className="text-sm text-zinc-600">{application.role}</p>
-          </div>
+      {/* Fluid Multi-Column Layout matching Today & Applications */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Primary Section (8 cols on lg) */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Main Info Card */}
+          <Card className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-[var(--border)]">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--foreground)]">
+                    {catName}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">
+                    Logged on {formatDate(application.appliedDate)}
+                  </span>
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                  {application.company}
+                </h1>
+                <p className="text-sm text-[var(--muted)]">{application.role}</p>
+              </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-zinc-500">Status:</span>
-            <select
-              value={application.status}
-              onChange={(e) => handleStatusChange(e.target.value as ApplicationStatus)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-800 focus:outline-none cursor-pointer"
-            >
-              {APPLICATION_STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-          {/* Follow-up info */}
-          <div className="space-y-1">
-            <span className="font-semibold text-zinc-500">Follow-up Target</span>
-            <p className="text-zinc-800">
-              {application.followUpDate ? formatDate(application.followUpDate) : "None scheduled"}
-            </p>
-          </div>
-
-          {/* Salary */}
-          <div className="space-y-1">
-            <span className="font-semibold text-zinc-500">Compensation / Salary</span>
-            <p className="text-zinc-800">{application.salary || "Not specified"}</p>
-          </div>
-
-          {/* Listing URL */}
-          <div className="space-y-1">
-            <span className="font-semibold text-zinc-500">Job Listing</span>
-            {application.jobUrl ? (
-              <a
-                href={application.jobUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-emerald-700 hover:underline block truncate"
-              >
-                {application.jobUrl}
-              </a>
-            ) : (
-              <p className="text-zinc-400">No URL provided</p>
-            )}
-          </div>
-
-          {/* Recruiter / Contact */}
-          <div className="space-y-1">
-            <span className="font-semibold text-zinc-500">Contact / Recruiter</span>
-            <p className="text-zinc-800">
-              {application.recruiterName || "None"}
-              {application.recruiterEmail ? ` (${application.recruiterEmail})` : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* Notes Section */}
-        <div className="pt-4 border-t border-zinc-100 space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-700">Notes</h2>
-            {!editingNotes && (
-              <button
-                type="button"
-                onClick={() => setEditingNotes(true)}
-                className="text-xs font-medium text-emerald-700 hover:underline"
-              >
-                Edit Notes
-              </button>
-            )}
-          </div>
-
-          {editingNotes ? (
-            <div className="space-y-2">
-              <textarea
-                rows={3}
-                value={notesValue}
-                onChange={(e) => setNotesValue(e.target.value)}
-                className="w-full p-2.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600 resize-none"
-                placeholder="Add any personal notes, referral context..."
-              />
-              <div className="flex items-center gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNotesValue(application.notes || "");
-                    setEditingNotes(false);
-                  }}
-                  className="px-3 py-1 text-xs text-zinc-600 rounded border border-zinc-200 hover:bg-zinc-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveNotes}
-                  disabled={savingNotes}
-                  className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded"
-                >
-                  {savingNotes ? "Saving..." : "Save"}
-                </button>
+              <div className="flex items-center gap-3">
+                <StatusSelect
+                  value={application.status}
+                  onChange={handleStatusChange}
+                />
               </div>
             </div>
-          ) : (
-            <p className="text-xs text-zinc-700 bg-zinc-50 p-3 rounded-lg border border-zinc-100 whitespace-pre-wrap">
-              {application.notes || "No notes added yet."}
-            </p>
-          )}
-        </div>
-      </div>
 
-      {/* Module 2.6: Timeline (Chronological Audit Trail) */}
-      <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-700">Timeline & Activity</h2>
-
-        {timeline.length === 0 ? (
-          <p className="text-xs text-zinc-400">No activity logged.</p>
-        ) : (
-          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-100">
-            {timeline.map((event) => (
-              <div key={event._id?.toString()} className="relative text-xs space-y-0.5">
-                <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-emerald-600 ring-4 ring-white" />
-                <p className="font-semibold text-zinc-800">{event.description}</p>
-                <p className="text-[10px] text-zinc-400">
-                  {formatDate(event.createdAt)} at {formatTime(event.createdAt)}
+            {/* Metadata Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
+              <div className="space-y-1">
+                <span className="font-semibold text-[var(--muted)] uppercase tracking-wider text-[10px]">
+                  Compensation
+                </span>
+                <p className="text-[var(--foreground)] text-sm font-medium">
+                  {application.salary || "Not specified"}
                 </p>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="space-y-1">
+                <span className="font-semibold text-[var(--muted)] uppercase tracking-wider text-[10px]">
+                  Contact Person
+                </span>
+                <p className="text-[var(--foreground)] text-sm font-medium">
+                  {application.recruiterName || "None specified"}
+                  {application.recruiterEmail ? ` (${application.recruiterEmail})` : ""}
+                </p>
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <span className="font-semibold text-[var(--muted)] uppercase tracking-wider text-[10px]">
+                  Job Listing
+                </span>
+                {application.jobUrl ? (
+                  <a
+                    href={application.jobUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[var(--accent-text)] hover:underline block truncate text-sm"
+                  >
+                    {application.jobUrl}
+                  </a>
+                ) : (
+                  <p className="text-[var(--muted-light)] text-sm">None provided</p>
+                )}
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div className="pt-5 border-t border-[var(--border)] space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
+                  Personal notes
+                </h2>
+                {!editingNotes && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingNotes(true)}
+                    className="text-xs font-medium text-[var(--accent-text)] hover:underline cursor-pointer"
+                  >
+                    Edit notes
+                  </button>
+                )}
+              </div>
+
+              {editingNotes ? (
+                <div className="space-y-2.5">
+                  <Textarea
+                    rows={4}
+                    value={notesValue}
+                    onChange={(e) => setNotesValue(e.target.value)}
+                    placeholder="Personal thoughts, portfolio variant, interview impressions, referral..."
+                  />
+                  <div className="flex items-center gap-2 justify-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setNotesValue(application.notes || "");
+                        setEditingNotes(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSaveNotes}
+                      loading={savingNotes}
+                    >
+                      Save Notes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--foreground)] bg-[var(--surface-hover)] p-4 rounded-xl border border-[var(--border)] whitespace-pre-wrap leading-relaxed">
+                  {application.notes || "No notes added yet."}
+                </p>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Rail: Follow-Up & Timeline (4 cols on lg) */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Follow-up Status Card */}
+          <Card className="p-5 space-y-3">
+            <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
+              Follow-up reminder
+            </h2>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {application.followUpDate ? formatDate(application.followUpDate) : "None scheduled"}
+              </p>
+              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                Automatically calculated based on your application date (+7 days).
+              </p>
+            </div>
+          </Card>
+
+          {/* Timeline Card */}
+          <Card className="p-5 space-y-4">
+            <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
+              Timeline &amp; Activity
+            </h2>
+
+            {timeline.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">No activity logged.</p>
+            ) : (
+              <div className="relative pl-5 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border)]">
+                {timeline.map((event) => (
+                  <div key={event._id?.toString()} className="relative text-xs space-y-0.5">
+                    <div className="absolute -left-5 top-1.5 w-2 h-2 rounded-full bg-[var(--accent)] ring-4 ring-[var(--surface)]" />
+                    <p className="font-medium text-[var(--foreground)] leading-snug">
+                      {event.description}
+                    </p>
+                    <p className="text-[10px] text-[var(--muted)]">
+                      {formatDate(event.createdAt)} at {formatTime(event.createdAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
+
+      {/* Reusable Confirm Modal for Deletion */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Remove Application"
+        message={`Are you sure you want to remove ${application.company} (${application.role})? This action cannot be undone.`}
+        confirmText="Remove Application"
+        cancelText="Keep Application"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }
-

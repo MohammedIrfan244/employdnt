@@ -23,6 +23,10 @@ This document tracks implementation status across all phases defined in [docs/pl
 ## Phase 1: Core Application ✅ (COMPLETED)
 
 ### 1.1 Foundation & Infrastructure
+- [x] **NextAuth v5 + Google OAuth & Proxy Protection:** Configured Auth.js with Google provider ([src/auth.ts](file:///d:/myprojects/employdnt/src/auth.ts), [src/app/api/auth/[...nextauth]/route.ts](file:///d:/myprojects/employdnt/src/app/api/auth/[...nextauth]/route.ts)), Next.js 16 `src/proxy.ts` route protection, and Google login view.
+- [x] **Reusable UI Component System:** Standardized atomic primitives in `src/components/ui/` (`Button`, `Input`, `Select`, `StatusSelect`, `Textarea`, `Badge`, `Card`) used across all forms, dialogs, and cards.
+- [x] **Human, Anti-Corporate Dark Design System:** Deep obsidian palette (`#0b0d10`, `#13161c`, `#1f232e`), emerald green indicator accents (`#10b981`), eliminated sterile SaaS gutters with a fluid layout up to `1680px`, and left sidebar app shell.
+- [x] **Vector SVG Branding & Icons:** Employdnt SVG ([public/svg/employdnt.svg](file:///d:/myprojects/employdnt/public/svg/employdnt.svg)) with responsive `viewBox` enabled, configured for app icon (`src/app/icon.svg`), metadata icons ([src/app/layout.tsx](file:///d:/myprojects/employdnt/src/app/layout.tsx)), sidebar branding, and authentication view.
 - [x] **Client Time Infrastructure:** Created client-date utils ([src/lib/date-utils.ts](file:///d:/myprojects/employdnt/src/lib/date-utils.ts)) and hydration-safe hook ([src/hooks/use-client-date.ts](file:///d:/myprojects/employdnt/src/hooks/use-client-date.ts)) to guarantee zero server-time bias.
 - [x] **Constants & Domain Configuration:** Application statuses, progressive milestones (`10 -> 15 -> 20 -> 30 -> 40 -> 50`), and default categories ([src/lib/constants.ts](file:///d:/myprojects/employdnt/src/lib/constants.ts)). *(Ref: Module 1.2, 2.5, 5.1)*
 - [x] **TypeScript Interfaces:** Defined `ICategory`, `IApplication`, `IDailyProgress`, and `IApplicationEvent` in `src/types/`. *(Ref: Module 11)*

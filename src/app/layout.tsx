@@ -13,8 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Employdnt",
-  description: "I got you bruv",
+  title: "employdnt — personal, quiet progress",
+  description: "Personal job search assistant without the corporate noise.",
+  icons: {
+    icon: [
+      { url: "/svg/employdnt.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/svg/employdnt.svg",
+    apple: "/svg/employdnt.svg",
+  },
 };
 
 export default function RootLayout({

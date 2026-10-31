@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useClientDate } from "@/hooks/use-client-date";
+import Button from "@/components/ui/button";
+import Input from "@/components/ui/input";
+import Select from "@/components/ui/select";
+import Textarea from "@/components/ui/textarea";
 import { ICategory } from "@/types/category";
 
 interface QuickAddModalProps {
@@ -31,7 +35,6 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
   const [salary, setSalary] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Fetch categories when opened
   useEffect(() => {
     if (!isOpen) return;
 
@@ -48,7 +51,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
           }
         }
       } catch {
-        // silent error fallback
+        // silent
       } finally {
         if (mounted) setLoadingCategories(false);
       }
@@ -67,11 +70,11 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
     setErrorMessage("");
 
     if (!company.trim()) {
-      setErrorMessage("Company name is required");
+      setErrorMessage("Company name is needed");
       return;
     }
     if (!role.trim()) {
-      setErrorMessage("Job role is required");
+      setErrorMessage("Job role is needed");
       return;
     }
     if (!categoryId) {
@@ -90,7 +93,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
         recruiterEmail: recruiterEmail.trim() || undefined,
         salary: salary.trim() || undefined,
         notes: notes.trim() || undefined,
-        clientDate: todayString, // Pass client local date
+        clientDate: todayString,
       };
 
       const res = await fetch("/api/applications", {
@@ -105,7 +108,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
         throw new Error(json.error || "Failed to add application");
       }
 
-      // Reset form
+      // Reset
       setCompany("");
       setRole("");
       setJobUrl("");
@@ -125,19 +128,24 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
     }
   };
 
+  const categoryOptions = categories.map((c) => ({
+    value: c._id?.toString() || "",
+    label: c.name,
+  }));
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-xs">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-zinc-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
+      <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900">Add Application</h2>
-            <p className="text-xs text-zinc-500">Record a new job submission in seconds</p>
+            <h2 className="text-base font-semibold text-[var(--foreground)]">Log an application</h2>
+            <p className="text-xs text-[var(--muted)]">Takes just a few seconds</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-600 p-1 rounded-md text-sm"
+            className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded-md text-sm transition-colors"
           >
             ✕
           </button>
@@ -152,141 +160,93 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
           )}
 
           {/* 3 Core Required Fields */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1">Company Name *</label>
-            <input
-              type="text"
-              required
-              autoFocus
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="e.g. Acme Corp"
-              className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-            />
-          </div>
+          <Input
+            label="Company *"
+            autoFocus
+            required
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            placeholder="e.g. Linear, Spotify, Local Studio"
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1">Job Role *</label>
-            <input
-              type="text"
-              required
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g. Frontend Engineer"
-              className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-            />
-          </div>
+          <Input
+            label="Role *"
+            required
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="e.g. Fullstack Engineer"
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1">Category *</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              disabled={loadingCategories || categories.length === 0}
-              className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
-            >
-              {loadingCategories ? (
-                <option>Loading categories...</option>
-              ) : categories.length === 0 ? (
-                <option>No categories found</option>
-              ) : (
-                categories.map((c) => (
-                  <option key={c._id?.toString()} value={c._id?.toString()}>
-                    {c.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+          <Select
+            label="Category *"
+            value={categoryId}
+            onChange={(val) => setCategoryId(val)}
+            options={categoryOptions}
+            placeholder={loadingCategories ? "Loading categories..." : undefined}
+          />
 
           {/* Collapsible Optional Section */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               onClick={() => setShowOptional(!showOptional)}
-              className="text-xs font-medium text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+              className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors flex items-center gap-1"
             >
-              <span>{showOptional ? "▼ Hide optional details" : "▶ Add more details (optional)"}</span>
+              <span>{showOptional ? "▾ Hide extra details" : "▸ Add extra details (salary, link, notes)"}</span>
             </button>
 
             {showOptional && (
-              <div className="mt-3 space-y-3 pt-3 border-t border-zinc-100">
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">Job Listing URL</label>
-                  <input
-                    type="url"
-                    value={jobUrl}
-                    onChange={(e) => setJobUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-3 py-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600"
-                  />
-                </div>
+              <div className="mt-3 space-y-3 pt-3 border-t border-[var(--border-light)]">
+                <Input
+                  label="Listing link"
+                  type="url"
+                  value={jobUrl}
+                  onChange={(e) => setJobUrl(e.target.value)}
+                  placeholder="https://..."
+                />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-zinc-600 mb-1">Recruiter Name</label>
-                    <input
-                      type="text"
-                      value={recruiterName}
-                      onChange={(e) => setRecruiterName(e.target.value)}
-                      placeholder="e.g. Sarah Jenkins"
-                      className="w-full px-3 py-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-zinc-600 mb-1">Recruiter Email</label>
-                    <input
-                      type="email"
-                      value={recruiterEmail}
-                      onChange={(e) => setRecruiterEmail(e.target.value)}
-                      placeholder="e.g. sarah@acme.com"
-                      className="w-full px-3 py-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">Salary / Compensation</label>
-                  <input
-                    type="text"
-                    value={salary}
-                    onChange={(e) => setSalary(e.target.value)}
-                    placeholder="e.g. $120k - $140k"
-                    className="w-full px-3 py-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600"
+                  <Input
+                    label="Contact name"
+                    value={recruiterName}
+                    onChange={(e) => setRecruiterName(e.target.value)}
+                    placeholder="Recruiter name"
+                  />
+                  <Input
+                    label="Contact email"
+                    type="email"
+                    value={recruiterEmail}
+                    onChange={(e) => setRecruiterEmail(e.target.value)}
+                    placeholder="email@company.com"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">Notes</label>
-                  <textarea
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any notes about referrals, questions asked..."
-                    className="w-full px-3 py-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-600 resize-none"
-                  />
-                </div>
+                <Input
+                  label="Salary / Pay"
+                  value={salary}
+                  onChange={(e) => setSalary(e.target.value)}
+                  placeholder="e.g. $130k or $65/hr"
+                />
+
+                <Textarea
+                  label="Notes"
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Referral name, portfolio variant used..."
+                />
               </div>
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="pt-4 flex items-center justify-end gap-3 border-t border-zinc-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-800 rounded-lg border border-zinc-200 hover:bg-zinc-50"
-            >
+          {/* Actions */}
+          <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-[var(--border-light)]">
+            <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={submitting}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {submitting ? "Adding..." : "Add Application"}
-            </button>
+            </Button>
+            <Button type="submit" variant="primary" size="sm" loading={submitting}>
+              Save Application
+            </Button>
           </div>
         </form>
       </div>

@@ -2,9 +2,9 @@ import React from "react";
 
 export default function Footer() {
   return (
-    <footer className="w-full border-t border-zinc-100 py-6 text-center text-xs text-zinc-400 bg-white">
-      <div className="max-w-6xl mx-auto px-4">
-        <p>Employdnt — Personal Job Search Assistant</p>
+    <footer className="w-full border-t border-[var(--border-light)] py-6 text-center text-xs text-[var(--muted-light)] bg-transparent">
+      <div className=" mx-auto px-4">
+        <p>employdnt — idk bruh, get a job maybe ?</p>
       </div>
     </footer>
   );
