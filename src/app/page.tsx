@@ -1,8 +1,5 @@
-import AppLayout from "@/components/layout/app-layout";
+import { redirect } from "next/navigation";
 
-
-export default function Home() {
-  return (
-    <AppLayout/>
-  );
+export default function RootPage() {
+  redirect("/today");
 }
