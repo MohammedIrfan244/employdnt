@@ -7,6 +7,7 @@ import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Badge, { getStatusBadgeVariant } from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
+import { Clock, Briefcase, Check, Mail, ArrowRight, ArrowUpRight } from "lucide-react";
 import { ICategory } from "@/types/category";
 import { IDailyProgress } from "@/types/daily-progress";
 import { IApplication } from "@/types/application";
@@ -180,12 +181,16 @@ export default function Today() {
           {/* Recent Applications Feed */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[var(--foreground)]">Recent logs</h2>
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-[var(--accent)]" />
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">Recent logs</h2>
+              </div>
               <Link
                 href="/applications"
-                className="text-xs font-medium text-[var(--accent-text)] hover:underline"
+                className="text-xs font-medium text-[var(--accent-text)] hover:underline flex items-center gap-1"
               >
-                View all applications →
+                View all applications
+                <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
 
@@ -255,16 +260,20 @@ export default function Today() {
           {/* Follow-up attention card */}
           <Card className="space-y-3.5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[var(--foreground)]">Follow-ups due</h2>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">Follow-ups due</h2>
+              </div>
               <div className="flex items-center gap-2">
                 {needsAttention.length > 0 && (
                   <Badge variant="followup">{needsAttention.length} pending</Badge>
                 )}
                 <Link
                   href="/follow-up"
-                  className="text-xs font-medium text-[var(--accent-text)] hover:underline"
+                  className="text-xs font-medium text-[var(--accent-text)] hover:underline flex items-center gap-0.5"
                 >
-                  View all →
+                  View all
+                  <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
             </div>
@@ -298,9 +307,10 @@ export default function Today() {
                           variant="primary"
                           size="sm"
                           onClick={() => setDraftApp(app)}
-                          className="text-[11px] py-1 px-2.5 shadow-xs"
+                          className="text-[11px] py-1 px-2.5 shadow-xs flex items-center gap-1"
                           title="Generate follow-up email draft"
                         >
+                          <Mail className="w-3 h-3" />
                           Draft
                         </Button>
                         <Button
@@ -308,10 +318,10 @@ export default function Today() {
                           size="sm"
                           disabled={isActioning}
                           onClick={() => handleCompleteFollowUp(app._id!.toString())}
-                          className="text-[11px] py-1 px-2"
+                          className="text-[11px] py-1 px-2 flex items-center justify-center"
                           title="Mark follow-up done"
                         >
-                          ✓
+                          <Check className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>

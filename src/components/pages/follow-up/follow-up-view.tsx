@@ -7,6 +7,7 @@ import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Badge from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
+import { Clock, Calendar, Check, CheckCircle2, Mail, X, ArrowUpRight } from "lucide-react";
 import { IApplication } from "@/types/application";
 import { IFollowUpOverview } from "@/services/follow-up.service";
 
@@ -131,8 +132,8 @@ export default function FollowUpView() {
 
             {overview.due.length === 0 ? (
               <Card className="py-12 text-center space-y-2">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-base">
-                  ✓
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-semibold text-[var(--foreground)]">
                   You are completely caught up!
@@ -194,9 +195,10 @@ export default function FollowUpView() {
                           variant="primary"
                           size="sm"
                           onClick={() => setDraftApp(app)}
-                          className="text-xs font-semibold py-1.5 px-3 shadow-xs"
+                          className="text-xs font-semibold py-1.5 px-3 shadow-xs flex items-center gap-1.5"
                         >
-                          Draft Email ↗
+                          <Mail className="w-3.5 h-3.5" />
+                          Draft Email
                         </Button>
 
                         <Button
@@ -204,10 +206,11 @@ export default function FollowUpView() {
                           size="sm"
                           disabled={isActioning}
                           onClick={() => handleAction(app._id!.toString(), "complete")}
-                          className="text-xs py-1.5 px-3"
+                          className="text-xs py-1.5 px-3 flex items-center gap-1"
                           title="Mark follow-up as sent and resolved"
                         >
-                          ✓ Done
+                          <Check className="w-3.5 h-3.5" />
+                          Done
                         </Button>
 
                         <Button
@@ -242,9 +245,12 @@ export default function FollowUpView() {
           {/* Section 2: Upcoming Follow-Ups (Scheduled Next 14 Days) */}
           <div className="space-y-4 pt-4 border-t border-[var(--border)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[var(--foreground)] tracking-tight">
-                Upcoming Schedule ({overview.upcoming.length})
-              </h2>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[var(--accent)]" />
+                <h2 className="text-sm font-semibold text-[var(--foreground)] tracking-tight">
+                  Upcoming Schedule ({overview.upcoming.length})
+                </h2>
+              </div>
               <span className="text-xs text-[var(--muted)]">Next 14 days</span>
             </div>
 
@@ -279,9 +285,10 @@ export default function FollowUpView() {
                         <button
                           type="button"
                           onClick={() => setDraftApp(app)}
-                          className="text-[var(--accent-text)] hover:underline font-medium cursor-pointer"
+                          className="text-[var(--accent-text)] hover:underline font-medium cursor-pointer flex items-center gap-1"
                         >
-                          Preview draft →
+                          Preview draft
+                          <ArrowUpRight className="w-3 h-3" />
                         </button>
                       </div>
                     </Card>

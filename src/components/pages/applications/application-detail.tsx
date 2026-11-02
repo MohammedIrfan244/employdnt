@@ -11,6 +11,7 @@ import StatusSelect from "@/components/ui/status-select";
 import ConfirmModal from "@/components/ui/confirm-modal";
 import Badge from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
+import { ArrowLeft, Trash2, ExternalLink, Mail, Check, CalendarPlus, X, Clock } from "lucide-react";
 import { ApplicationStatus } from "@/lib/constants";
 import { IApplication } from "@/types/application";
 import { IApplicationEvent } from "@/types/application-event";
@@ -161,7 +162,8 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
           href="/applications"
           className="text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 transition-colors"
         >
-          <span>←</span> Back to applications
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to applications
         </Link>
 
         <Button
@@ -169,7 +171,9 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
           variant="danger"
           size="sm"
           onClick={() => setIsDeleteModalOpen(true)}
+          className="flex items-center gap-1.5"
         >
+          <Trash2 className="w-3.5 h-3.5" />
           Remove Application
         </Button>
       </div>
@@ -234,9 +238,10 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
                     href={application.jobUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[var(--accent-text)] hover:underline block truncate text-sm"
+                    className="text-[var(--accent-text)] hover:underline inline-flex items-center gap-1 text-sm truncate max-w-full"
                   >
-                    {application.jobUrl}
+                    <span className="truncate">{application.jobUrl}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
                   </a>
                 ) : (
                   <p className="text-[var(--muted-light)] text-sm">None provided</p>
@@ -306,9 +311,12 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
           {/* Follow-up Status Card */}
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
-                Follow-up reminder
-              </h2>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--accent)]" />
+                <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
+                  Follow-up reminder
+                </h2>
+              </div>
               {application.followUpCompleted ? (
                 <Badge variant="applied">Completed</Badge>
               ) : application.followUpDismissed ? (
@@ -344,9 +352,10 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="w-full justify-center text-xs"
+                className="w-full justify-center text-xs flex items-center gap-1.5"
                 onClick={() => setIsDraftModalOpen(true)}
               >
+                <Mail className="w-3.5 h-3.5" />
                 Draft Follow-Up Email
               </Button>
 
@@ -356,33 +365,36 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-[11px] px-1 justify-center"
+                    className="text-[11px] px-1 justify-center flex items-center gap-1"
                     loading={actingFollowUp}
                     onClick={() => handleFollowUpAction("complete")}
                     title="Mark follow-up completed"
                   >
-                    ✓ Done
+                    <Check className="w-3 h-3" />
+                    Done
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-[11px] px-1 justify-center"
+                    className="text-[11px] px-1 justify-center flex items-center gap-1"
                     loading={actingFollowUp}
                     onClick={() => handleFollowUpAction("postpone", 3)}
                     title="Postpone follow-up by 3 days"
                   >
-                    +3 Days
+                    <CalendarPlus className="w-3 h-3" />
+                    +3d
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-[11px] px-1 justify-center text-[var(--muted)] hover:text-[var(--danger)]"
+                    className="text-[11px] px-1 justify-center text-[var(--muted)] hover:text-[var(--danger)] flex items-center gap-1"
                     loading={actingFollowUp}
                     onClick={() => handleFollowUpAction("dismiss")}
                     title="Dismiss reminder"
                   >
+                    <X className="w-3 h-3" />
                     Dismiss
                   </Button>
                 </div>

@@ -6,6 +6,7 @@ import Textarea from "@/components/ui/textarea";
 import Input from "@/components/ui/input";
 import { IApplication } from "@/types/application";
 import { useClientDate } from "@/hooks/use-client-date";
+import { Mail, Copy, Check, ExternalLink, CheckCircle2, X } from "lucide-react";
 
 interface FollowUpDraftModalProps {
   isOpen: boolean;
@@ -153,12 +154,14 @@ export default function FollowUpDraftModal({
         <div className="flex items-start justify-between pb-3 border-b border-[var(--border)] shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+              <div className="w-6 h-6 rounded-lg bg-[var(--accent-light)] border border-[var(--accent-border)] flex items-center justify-center text-[var(--accent)]">
+                <Mail className="w-3.5 h-3.5" />
+              </div>
               <h3 className="text-base font-bold text-[var(--foreground)] tracking-tight">
                 Follow-Up Email Draft
               </h3>
             </div>
-            <p className="text-xs text-[var(--muted)] mt-0.5">
+            <p className="text-xs text-[var(--muted)] mt-1">
               {application.company} • {application.role}
               {application.recruiterEmail && ` (${application.recruiterEmail})`}
             </p>
@@ -167,9 +170,10 @@ export default function FollowUpDraftModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-[var(--muted)] hover:text-[var(--foreground)] text-sm px-2 py-1 rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+            className="text-[var(--muted)] hover:text-[var(--foreground)] p-1.5 rounded-lg hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+            aria-label="Close modal"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -246,10 +250,11 @@ export default function FollowUpDraftModal({
                 size="sm"
                 onClick={handleDone}
                 loading={markingDone}
-                className="w-full sm:w-auto text-xs"
+                className="w-full sm:w-auto text-xs flex items-center justify-center gap-1.5"
                 title="Mark this reminder as resolved"
               >
-                ✓ Mark as Completed
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                Mark as Completed
               </Button>
             )}
           </div>
@@ -260,9 +265,10 @@ export default function FollowUpDraftModal({
               variant="secondary"
               size="sm"
               onClick={handleOpenEmailClient}
-              className="w-full sm:w-auto text-xs"
+              className="w-full sm:w-auto text-xs flex items-center justify-center gap-1.5"
             >
-              Open Email Client ↗
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open Email Client
             </Button>
 
             <Button
@@ -270,9 +276,19 @@ export default function FollowUpDraftModal({
               variant="primary"
               size="sm"
               onClick={handleCopy}
-              className="w-full sm:w-auto text-xs font-semibold"
+              className="w-full sm:w-auto text-xs font-semibold flex items-center justify-center gap-1.5"
             >
-              {copied ? "✓ Copied to Clipboard!" : "Copy Draft"}
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  Copied to Clipboard!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Draft
+                </>
+              )}
             </Button>
           </div>
         </div>

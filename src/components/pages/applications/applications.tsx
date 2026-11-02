@@ -9,6 +9,7 @@ import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import StatusSelect from "@/components/ui/status-select";
 import Card from "@/components/ui/card";
+import { Plus, ArrowRight } from "lucide-react";
 import { APPLICATION_STATUSES, ApplicationStatus } from "@/lib/constants";
 import { IApplication } from "@/types/application";
 import { ICategory } from "@/types/category";
@@ -117,9 +118,9 @@ export default function Applications() {
           variant="primary"
           size="md"
           onClick={() => setIsQuickAddOpen(true)}
-          className="self-start sm:self-auto"
+          className="self-start sm:self-auto flex items-center gap-1.5"
         >
-          <span>+</span> Log application
+          <Plus className="w-4 h-4" /> Log application
         </Button>
       </div>
 
@@ -194,8 +195,9 @@ export default function Applications() {
                   />
 
                   <Link href={`/applications/${app._id}`}>
-                    <Button variant="ghost" size="sm">
-                      Details →
+                    <Button variant="ghost" size="sm" className="flex items-center gap-1 text-xs">
+                      Details
+                      <ArrowRight className="w-3 h-3" />
                     </Button>
                   </Link>
                 </div>
