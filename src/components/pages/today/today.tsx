@@ -6,6 +6,7 @@ import { useClientDate } from "@/hooks/use-client-date";
 import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Badge, { getStatusBadgeVariant } from "@/components/ui/badge";
+import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
 import { ICategory } from "@/types/category";
 import { IDailyProgress } from "@/types/daily-progress";
 import { IApplication } from "@/types/application";
@@ -22,6 +23,8 @@ export default function Today() {
   const [needsAttention, setNeedsAttention] = useState<IApplication[]>([]);
   const [recentApplications, setRecentApplications] = useState<IApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draftApp, setDraftApp] = useState<IApplication | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     if (!todayString) return;
@@ -29,7 +32,7 @@ export default function Today() {
     try {
       const [progRes, attnRes, recentRes] = await Promise.all([
         fetch(`/api/progress/today?clientDate=${encodeURIComponent(todayString)}`),
-        fetch("/api/follow-up"),
+        fetch(`/api/follow-up?clientDate=${encodeURIComponent(todayString)}`),
         fetch("/api/applications?recent=true&limit=8"),
       ]);
 
@@ -43,7 +46,10 @@ export default function Today() {
         setCategoriesProgress(progData.data.categories || []);
       }
       if (attnData.success) {
-        setNeedsAttention(attnData.data || []);
+        const list = Array.isArray(attnData.data)
+          ? attnData.data
+          : attnData.data?.due || [];
+        setNeedsAttention(list);
       }
       if (recentData.success) {
         setRecentApplications(recentData.data || []);
@@ -60,6 +66,25 @@ export default function Today() {
       fetchDashboardData();
     }
   }, [isClient, todayString, fetchDashboardData]);
+
+  const handleCompleteFollowUp = async (applicationId: string) => {
+    setActioningId(applicationId);
+    try {
+      const res = await fetch(`/api/follow-up/${applicationId}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete", clientDate: todayString }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await fetchDashboardData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setActioningId(null);
+    }
+  };
 
   const totalLifetime = categoriesProgress.reduce(
     (acc, curr) => acc + (curr.category.lifetimeCount || 0),
@@ -85,9 +110,9 @@ export default function Today() {
         </div>
       </div>
 
-      {/* Fluid Multi-Column Layout - Perfectly Proportioned Across Ultrawide Monitors */}
+      {/* Fluid Multi-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left / Center Area: Daily Rhythm & Recent Logs (8 cols on lg, 8 on xl, 9 on 2xl) */}
+        {/* Left Area: Daily Rhythm & Recent Logs (8 cols on lg, 8 on xl, 9 on 2xl) */}
         <div className="lg:col-span-8 2xl:col-span-9 space-y-6">
           {/* Daily Goals / Rhythm */}
           <div className="space-y-3">
@@ -119,31 +144,29 @@ export default function Today() {
                     <Card key={category._id?.toString()} hover className="space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <h3 className="font-semibold text-sm text-[var(--foreground)]">
+                          <h3 className="font-bold text-sm text-[var(--foreground)] tracking-tight">
                             {category.name}
                           </h3>
-                          <p className="text-xs text-[var(--muted)] mt-0.5">
-                            {category.lifetimeCount || 0} applications logged
+                          <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                            {category.lifetimeCount || 0} applications logged so far
                           </p>
                         </div>
-
                         <div className="text-right">
-                          <div className="text-sm font-bold text-[var(--accent-text)]">
-                            {count}{" "}
-                            <span className="text-[var(--muted)] font-normal text-xs">/ {target}</span>
-                          </div>
-                          {reachedInitial && (
-                            <span className="text-[10px] font-semibold text-[var(--accent-text)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded-full border border-[var(--accent-border)]">
-                              Target reached
-                            </span>
-                          )}
+                          <span className="text-xs font-mono font-bold text-[var(--foreground)]">
+                            {count}
+                          </span>
+                          <span className="text-xs text-[var(--muted)] font-mono">
+                            {" "}/ {target}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Tactile progress bar */}
-                      <div className="w-full bg-[var(--surface-hover)] border border-[var(--border)] rounded-full h-2.5 overflow-hidden">
+                      {/* Quiet Progress Bar */}
+                      <div className="w-full bg-[var(--surface-hover)] rounded-full h-1.5 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-[var(--accent)] transition-all duration-500 ease-out shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                          className={`h-full transition-all duration-500 ease-out rounded-full ${
+                            reachedInitial ? "bg-emerald-400" : "bg-[var(--accent)]"
+                          }`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -155,7 +178,7 @@ export default function Today() {
           </div>
 
           {/* Recent Applications Feed */}
-          <div className="space-y-3">
+          <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--foreground)]">Recent logs</h2>
               <Link
@@ -166,12 +189,13 @@ export default function Today() {
               </Link>
             </div>
 
-            {recentApplications.length === 0 ? (
-              <Card className="text-center py-12 space-y-2">
-                <p className="text-sm font-medium text-[var(--foreground)]">No applications logged yet</p>
-                <p className="text-xs text-[var(--muted)]">
-                  Use the &quot;+ Log application&quot; button above to log your first job submission.
-                </p>
+            {loading ? (
+              <div className="p-8 rounded-2xl bg-[var(--surface)] border border-[var(--border)] text-center text-xs text-[var(--muted)] animate-pulse">
+                Loading recent logs...
+              </div>
+            ) : recentApplications.length === 0 ? (
+              <Card className="text-center py-8 text-xs text-[var(--muted)]">
+                Nothing logged yet. Use the &quot;+ Log application&quot; button above to log your first job submission.
               </Card>
             ) : (
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl divide-y divide-[var(--border)] overflow-hidden shadow-xs">
@@ -184,19 +208,21 @@ export default function Today() {
                   return (
                     <div
                       key={app._id?.toString()}
-                      className="p-4 flex items-center justify-between hover:bg-[var(--surface-hover)] transition-colors"
+                      className="p-3.5 flex items-center justify-between hover:bg-[var(--surface-hover)] transition-colors gap-3"
                     >
-                      <div className="space-y-0.5">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/applications/${app._id}`}
-                            className="text-sm font-semibold text-[var(--foreground)] hover:text-[var(--accent-text)] transition-colors"
+                            className="text-xs font-semibold text-[var(--foreground)] hover:text-[var(--accent-text)] transition-colors truncate"
                           >
                             {app.company}
                           </Link>
-                          <span className="text-xs text-[var(--muted)]">• {app.role}</span>
+                          <span className="text-xs text-[var(--muted)] truncate">
+                            • {app.role}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--muted)]">
                           <span className="text-[11px] px-2 py-0.5 rounded bg-[var(--surface-hover)] border border-[var(--border)]">
                             {catName}
                           </span>
@@ -205,7 +231,7 @@ export default function Today() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <Badge variant={getStatusBadgeVariant(app.status)}>
                           {app.status}
                         </Badge>
@@ -230,9 +256,17 @@ export default function Today() {
           <Card className="space-y-3.5">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--foreground)]">Follow-ups due</h2>
-              {needsAttention.length > 0 && (
-                <Badge variant="followup">{needsAttention.length} pending</Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {needsAttention.length > 0 && (
+                  <Badge variant="followup">{needsAttention.length} pending</Badge>
+                )}
+                <Link
+                  href="/follow-up"
+                  className="text-xs font-medium text-[var(--accent-text)] hover:underline"
+                >
+                  View all →
+                </Link>
+              </div>
             </div>
 
             {needsAttention.length === 0 ? (
@@ -241,24 +275,48 @@ export default function Today() {
               </p>
             ) : (
               <div className="space-y-2.5">
-                {needsAttention.map((app) => (
-                  <div
-                    key={app._id?.toString()}
-                    className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-[var(--foreground)] truncate">
-                        {app.company}
-                      </p>
-                      <p className="text-[11px] text-[var(--muted)] truncate">{app.role}</p>
+                {needsAttention.slice(0, 5).map((app) => {
+                  const isActioning = actioningId === app._id?.toString();
+
+                  return (
+                    <div
+                      key={app._id?.toString()}
+                      className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/applications/${app._id}`}
+                          className="text-xs font-semibold text-[var(--foreground)] truncate hover:text-[var(--accent-text)] transition-colors block"
+                        >
+                          {app.company}
+                        </Link>
+                        <p className="text-[11px] text-[var(--muted)] truncate">{app.role}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => setDraftApp(app)}
+                          className="text-[11px] py-1 px-2.5 shadow-xs"
+                          title="Generate follow-up email draft"
+                        >
+                          Draft
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={isActioning}
+                          onClick={() => handleCompleteFollowUp(app._id!.toString())}
+                          className="text-[11px] py-1 px-2"
+                          title="Mark follow-up done"
+                        >
+                          ✓
+                        </Button>
+                      </div>
                     </div>
-                    <Link href={`/applications/${app._id}`}>
-                      <Button variant="secondary" size="sm">
-                        Review
-                      </Button>
-                    </Link>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
@@ -277,6 +335,16 @@ export default function Today() {
           </Card>
         </div>
       </div>
+
+      {/* Follow-Up Email Draft Modal */}
+      <FollowUpDraftModal
+        isOpen={Boolean(draftApp)}
+        onClose={() => setDraftApp(null)}
+        application={draftApp}
+        onMarkDone={async (applicationId) => {
+          await handleCompleteFollowUp(applicationId);
+        }}
+      />
     </div>
   );
 }
