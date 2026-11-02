@@ -22,6 +22,12 @@ export interface IFollowUpOverview {
 export async function getFollowUpOverview(clientDateStr?: string): Promise<IFollowUpOverview> {
   await connectDB();
 
+  // Auto-heal any legacy out-of-sync records: completed follow-ups still marked "Follow-up Needed"
+  await Application.updateMany(
+    { followUpCompleted: true, status: "Follow-up Needed" },
+    { $set: { status: "Applied" } }
+  );
+
   // Establish client reference date
   let clientReferenceDate: Date;
   if (clientDateStr && /^\d{4}-\d{2}-\d{2}$/.test(clientDateStr)) {
@@ -92,6 +98,17 @@ export async function completeFollowUp(id: string): Promise<IApplication | null>
   if (!application) return null;
 
   application.followUpCompleted = true;
+
+  // Revert temporary "Follow-up Needed" status back to "Applied"
+  if (application.status === "Follow-up Needed") {
+    application.status = "Applied";
+    await logTimelineEvent(
+      id,
+      EVENT_TYPES.STATUS_CHANGED,
+      'Status updated from "Follow-up Needed" to "Applied"'
+    );
+  }
+
   await application.save();
 
   await logTimelineEvent(id, EVENT_TYPES.FOLLOW_UP_COMPLETED, "Follow-up marked as completed");
@@ -124,6 +141,17 @@ export async function postponeFollowUp(
   application.followUpDate = newFollowUpDate;
   application.followUpCompleted = false;
   application.followUpDismissed = false;
+
+  // Revert "Follow-up Needed" back to "Applied" as follow-up is deferred to the future date
+  if (application.status === "Follow-up Needed") {
+    application.status = "Applied";
+    await logTimelineEvent(
+      id,
+      EVENT_TYPES.STATUS_CHANGED,
+      'Status updated from "Follow-up Needed" to "Applied"'
+    );
+  }
+
   await application.save();
 
   const formattedDate = newFollowUpDate.toLocaleDateString("en-US", {
@@ -151,6 +179,17 @@ export async function dismissFollowUp(id: string): Promise<IApplication | null> 
   if (!application) return null;
 
   application.followUpDismissed = true;
+
+  // Revert "Follow-up Needed" back to "Applied" as reminder is dismissed
+  if (application.status === "Follow-up Needed") {
+    application.status = "Applied";
+    await logTimelineEvent(
+      id,
+      EVENT_TYPES.STATUS_CHANGED,
+      'Status updated from "Follow-up Needed" to "Applied"'
+    );
+  }
+
   await application.save();
 
   await logTimelineEvent(id, EVENT_TYPES.FOLLOW_UP_DISMISSED, "Follow-up reminder dismissed");

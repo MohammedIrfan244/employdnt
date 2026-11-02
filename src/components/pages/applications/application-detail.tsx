@@ -399,6 +399,36 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
                   </Button>
                 </div>
               )}
+
+              {application.followUpCompleted && !["Offer", "Rejected", "Withdrawn"].includes(application.status) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-xs text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 pt-1"
+                  loading={actingFollowUp}
+                  onClick={() => handleFollowUpAction("postpone", 7)}
+                  title="Schedule another follow-up in 7 days"
+                >
+                  <CalendarPlus className="w-3.5 h-3.5" />
+                  Schedule Next Follow-Up (+7d)
+                </Button>
+              )}
+
+              {application.followUpDismissed && !["Offer", "Rejected", "Withdrawn"].includes(application.status) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-xs text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 pt-1"
+                  loading={actingFollowUp}
+                  onClick={() => handleFollowUpAction("postpone", 3)}
+                  title="Reactivate follow-up reminder"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Reactivate Reminder (+3d)
+                </Button>
+              )}
             </div>
           </Card>
 
