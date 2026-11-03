@@ -6,15 +6,15 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ## Current Status Overview
 
-- **Active Phase:** Phase 1 — Core Application (Complete) ➔ Ready for Phase 2: Follow-Up Assistant
-- **Active Step:** Phase 1 Complete (Verification on `core` feature branch)
-- **Current Milestone:** Full CRUD, Category Progressive Goal System, Today Dashboard, Application Details & Timeline operational.
+- **Active Phase:** Phase 2 — Follow-Up Assistant (Complete) ➔ Ready for Phase 3: Gmail Integration
+- **Active Step:** Phase 2 Verification & Review on `follow-up` feature branch
+- **Current Milestone:** Automated follow-up scheduling, Due/Overdue queue, Draft Generator (3 tones, mailto/copy), and Follow-up Management View fully operational.
 
 | Phase | Description | Reference (`plan.md`) | Status |
 |---|---|---|---|
 | **Phase 1** | Core Application (CRUD, Categories, Progressive Goals, Dashboard) | Modules 1, 2, 5, 9, 11 | **COMPLETED** ✅ |
-| **Phase 2** | Follow-Up Assistant (Auto-scheduling, Needs Attention, Drafts) | Modules 1.4, 3, 8 | **NEXT UP** 🟡 |
-| **Phase 3** | Gmail Integration (OAuth, detection, matching, alerts) | Modules 4, 8 | PENDING ⚪ |
+| **Phase 2** | Follow-Up Assistant (Auto-scheduling, Needs Attention, Drafts) | Modules 1.4, 3, 8 | **COMPLETED** ✅ |
+| **Phase 3** | Gmail Integration (OAuth, detection, matching, alerts) | Modules 4, 8 | **NEXT UP** 🟡 |
 | **Phase 4** | Supporting Modules (Profile, Resumes, Resources, Settings) | Modules 6, 7, 10 | PENDING ⚪ |
 | **Phase 5** | Polish & Optimization (Responsive, accessibility, error handling) | Modules 9.4, 12 | PENDING ⚪ |
 
@@ -87,12 +87,31 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ---
 
-## Phase 2: Follow-Up Assistant ⚪ (NEXT UP)
+## Phase 2: Follow-Up Assistant ✅ (COMPLETED)
 *(Ref: docs/plan.md Module 3, 1.4, 8)*
-- [ ] **Follow-Up Automation:** Query applications where `followUpDate <= clientToday` and follow-up is neither completed nor dismissed.
-- [ ] **Needs Attention Full Section:** Populate dashboard with due follow-ups.
-- [ ] **Follow-up Actions:** Mark as done, postpone (e.g. +3 days), or dismiss.
-- [ ] **Draft Generator:** Client-side template generator to draft concise follow-up emails without automated sending.
+- [x] **Follow-Up Automation ([src/services/follow-up.service.ts](file:///d:/myprojects/employdnt/src/services/follow-up.service.ts)):**
+  - Query applications where `followUpDate <= clientToday` (zero server-time bias) or status is `Follow-up Needed`.
+  - Exclude completed (`followUpCompleted: true`), dismissed (`followUpDismissed: true`), and terminal statuses (`Offer`, `Rejected`, `Withdrawn`).
+  - Calculate upcoming follow-up queue for the next 14 days and lifetime completed counts.
+- [x] **Needs Attention Full Section ([src/components/pages/today/today.tsx](file:///d:/myprojects/employdnt/src/components/pages/today/today.tsx)):**
+  - Scoped with client date parameter (`clientDate=YYYY-MM-DD`).
+  - Inline action buttons (`Draft` and `Done`) directly on due items with instant modal launch and completion.
+  - Linked to dedicated `/follow-up` management view.
+- [x] **Follow-up Actions & Endpoints ([src/app/api/follow-up/[id]/action/route.ts](file:///d:/myprojects/employdnt/src/app/api/follow-up/[id]/action/route.ts)):**
+  - Action dispatch for `complete`, `postpone` (+N days), and `dismiss`.
+  - Full audit trail logging to `ApplicationEvent` timeline (`FOLLOW_UP_COMPLETED`, `FOLLOW_UP_POSTPONED`, `FOLLOW_UP_DISMISSED`).
+- [x] **Draft Generator Modal ([src/components/shared/follow-up-draft-modal.tsx](file:///d:/myprojects/employdnt/src/components/shared/follow-up-draft-modal.tsx)):**
+  - 3 customizable tones (*Direct & Polite*, *Short & Sweet*, *Value-Focused*) generating pre-filled subject and body.
+  - Dynamic recruiter greeting and relative submission timing.
+  - 1-click clipboard copy with visual feedback, `mailto:` launcher for user's native email client, and quick "Mark as Completed" action.
+  - Strict compliance with core design rule: **zero automated sending**.
+- [x] **Follow-Up Management View ([src/app/(dashboard)/follow-up/page.tsx](file:///d:/myprojects/employdnt/src/app/(dashboard)/follow-up/page.tsx), [src/components/pages/follow-up/follow-up-view.tsx](file:///d:/myprojects/employdnt/src/components/pages/follow-up/follow-up-view.tsx)):**
+  - Due / Overdue section with inline Draft, Done (`✓`), Postpone (+3d), and Dismiss actions.
+  - Upcoming 14-day schedule overview with days-until counters and preview drafts.
+  - Empty states when all caught up.
+- [x] **Application Detail Integration ([src/components/pages/applications/application-detail.tsx](file:///d:/myprojects/employdnt/src/components/pages/applications/application-detail.tsx)):**
+  - Dynamic follow-up status card (Completed, Dismissed, Inactive, Due Now, Scheduled).
+  - "Draft Follow-Up Email" button opening the draft modal, plus quick `Done`, `+3 Days`, and `Dismiss` buttons updating the audit timeline.
 
 ---
 

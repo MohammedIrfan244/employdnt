@@ -99,6 +99,12 @@ export async function createApplication(dto: CreateApplicationDTO): Promise<IApp
 export async function getApplications(filters: ApplicationFilterDTO = {}) {
   await connectDB();
 
+  // Auto-heal any legacy records where followUpCompleted: true but status remains "Follow-up Needed"
+  await Application.updateMany(
+    { followUpCompleted: true, status: "Follow-up Needed" },
+    { $set: { status: "Applied" } }
+  );
+
   const query: Record<string, unknown> = {};
 
   if (filters.categoryId) {
@@ -140,8 +146,16 @@ export async function getApplications(filters: ApplicationFilterDTO = {}) {
  */
 export async function getApplicationById(id: string): Promise<IApplication | null> {
   await connectDB();
-  const app = await Application.findById(id).populate("categoryId", "name defaultTarget").lean();
-  return app ? JSON.parse(JSON.stringify(app)) : null;
+  const app = await Application.findById(id).populate("categoryId", "name defaultTarget");
+  if (!app) return null;
+
+  // Auto-heal legacy out-of-sync state: followUpCompleted: true while status: "Follow-up Needed"
+  if (app.followUpCompleted && app.status === "Follow-up Needed") {
+    app.status = "Applied";
+    await app.save();
+  }
+
+  return JSON.parse(JSON.stringify(app));
 }
 
 /**
@@ -158,6 +172,23 @@ export async function updateApplication(
 
   const oldStatus = existing.status;
   const newStatus = updates.status;
+
+  // Synchronize status changes with follow-up flags
+  if (newStatus && newStatus !== oldStatus) {
+    if (newStatus === "Follow-up Needed") {
+      // User explicitly set status to Follow-up Needed:
+      // Reactivate follow-up so it appears in the queue as due immediately
+      updates.followUpCompleted = false;
+      updates.followUpDismissed = false;
+      updates.followUpDate = new Date();
+    } else if (oldStatus === "Follow-up Needed") {
+      // Moving away from Follow-up Needed marks the follow-up as resolved
+      updates.followUpCompleted = true;
+    } else if (["Offer", "Rejected", "Withdrawn"].includes(newStatus)) {
+      // Terminal statuses disable follow-up reminders
+      updates.followUpDismissed = true;
+    }
+  }
 
   const updated = await Application.findByIdAndUpdate(
     id,

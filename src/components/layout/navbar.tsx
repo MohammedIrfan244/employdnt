@@ -6,6 +6,7 @@ import NextLink from "next/link";
 import { signOut } from "next-auth/react";
 import Button from "@/components/ui/button";
 import BrandBadge from "@/components/ui/brand-badge";
+import { Plus } from "lucide-react";
 
 interface NavbarProps {
   onOpenQuickAdd?: () => void;
@@ -117,9 +118,9 @@ export default function Navbar({ onOpenQuickAdd }: NavbarProps) {
               variant="primary"
               size="sm"
               onClick={onOpenQuickAdd}
-              className="text-xs font-semibold py-1.5 px-3.5 shadow-xs"
+              className="text-xs font-semibold py-1.5 px-3.5 shadow-xs flex items-center gap-1.5"
             >
-              <span className="font-bold mr-1">+</span>
+              <Plus className="w-3.5 h-3.5" />
               <span>Log application</span>
             </Button>
           )}

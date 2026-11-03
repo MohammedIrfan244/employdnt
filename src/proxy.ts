@@ -26,6 +26,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/today", request.url));
   }
 
+  // If user visits root '/', redirect to /today
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/today", request.url));
+  }
+
   return NextResponse.next();
 }
 

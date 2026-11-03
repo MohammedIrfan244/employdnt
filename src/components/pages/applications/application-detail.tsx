@@ -9,6 +9,9 @@ import Card from "@/components/ui/card";
 import Textarea from "@/components/ui/textarea";
 import StatusSelect from "@/components/ui/status-select";
 import ConfirmModal from "@/components/ui/confirm-modal";
+import Badge from "@/components/ui/badge";
+import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
+import { ArrowLeft, Trash2, ExternalLink, Mail, Check, CalendarPlus, X, Clock } from "lucide-react";
 import { ApplicationStatus } from "@/lib/constants";
 import { IApplication } from "@/types/application";
 import { IApplicationEvent } from "@/types/application-event";
@@ -19,7 +22,7 @@ interface ApplicationDetailProps {
 
 export default function ApplicationDetail({ id }: ApplicationDetailProps) {
   const router = useRouter();
-  const { formatDate, formatTime } = useClientDate();
+  const { formatDate, formatTime, todayString } = useClientDate();
 
   const [application, setApplication] = useState<IApplication | null>(null);
   const [timeline, setTimeline] = useState<IApplicationEvent[]>([]);
@@ -29,6 +32,8 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
   const [savingNotes, setSavingNotes] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+  const [actingFollowUp, setActingFollowUp] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -105,6 +110,26 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
     }
   };
 
+  const handleFollowUpAction = async (action: "complete" | "postpone" | "dismiss", days = 3) => {
+    if (!application) return;
+    setActingFollowUp(true);
+    try {
+      const res = await fetch(`/api/follow-up/${application._id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, days, clientDate: todayString }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await loadData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setActingFollowUp(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-12 rounded-2xl bg-[var(--surface)] border border-[var(--border)] text-center text-xs text-[var(--muted)] animate-pulse">
@@ -137,7 +162,8 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
           href="/applications"
           className="text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 transition-colors"
         >
-          <span>←</span> Back to applications
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to applications
         </Link>
 
         <Button
@@ -145,7 +171,9 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
           variant="danger"
           size="sm"
           onClick={() => setIsDeleteModalOpen(true)}
+          className="flex items-center gap-1.5"
         >
+          <Trash2 className="w-3.5 h-3.5" />
           Remove Application
         </Button>
       </div>
@@ -210,9 +238,10 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
                     href={application.jobUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[var(--accent-text)] hover:underline block truncate text-sm"
+                    className="text-[var(--accent-text)] hover:underline inline-flex items-center gap-1 text-sm truncate max-w-full"
                   >
-                    {application.jobUrl}
+                    <span className="truncate">{application.jobUrl}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
                   </a>
                 ) : (
                   <p className="text-[var(--muted-light)] text-sm">None provided</p>
@@ -280,17 +309,126 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
         {/* Right Rail: Follow-Up & Timeline (4 cols on lg) */}
         <div className="lg:col-span-4 space-y-6">
           {/* Follow-up Status Card */}
-          <Card className="p-5 space-y-3">
-            <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
-              Follow-up reminder
-            </h2>
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--accent)]" />
+                <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
+                  Follow-up reminder
+                </h2>
+              </div>
+              {application.followUpCompleted ? (
+                <Badge variant="applied">Completed</Badge>
+              ) : application.followUpDismissed ? (
+                <Badge variant="default">Dismissed</Badge>
+              ) : ["Offer", "Rejected", "Withdrawn"].includes(application.status) ? (
+                <Badge variant="default">Inactive</Badge>
+              ) : (application.status === "Follow-up Needed" || (application.followUpDate && todayString && new Date(application.followUpDate).toISOString().slice(0, 10) <= todayString)) ? (
+                <Badge variant="followup">Due Now</Badge>
+              ) : (
+                <Badge variant="default">Scheduled</Badge>
+              )}
+            </div>
+
             <div className="space-y-1">
               <p className="text-sm font-semibold text-[var(--foreground)]">
                 {application.followUpDate ? formatDate(application.followUpDate) : "None scheduled"}
               </p>
               <p className="text-[11px] text-[var(--muted)] leading-relaxed">
-                Automatically calculated based on your application date (+7 days).
+                {application.followUpCompleted
+                  ? "Follow-up has been marked as completed for this application."
+                  : application.followUpDismissed
+                  ? "Follow-up reminder for this application has been dismissed."
+                  : ["Offer", "Rejected", "Withdrawn"].includes(application.status)
+                  ? "Follow-up is not required for terminal statuses."
+                  : (application.status === "Follow-up Needed" || (application.followUpDate && todayString && new Date(application.followUpDate).toISOString().slice(0, 10) <= todayString))
+                  ? "Action recommended: Send a polite check-in email."
+                  : "Automatically calculated based on your application date (+7 days)."}
               </p>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--border)] flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full justify-center text-xs flex items-center gap-1.5"
+                onClick={() => setIsDraftModalOpen(true)}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Draft Follow-Up Email
+              </Button>
+
+              {!application.followUpCompleted && !["Offer", "Rejected", "Withdrawn"].includes(application.status) && (
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] px-1 justify-center flex items-center gap-1"
+                    loading={actingFollowUp}
+                    onClick={() => handleFollowUpAction("complete")}
+                    title="Mark follow-up completed"
+                  >
+                    <Check className="w-3 h-3" />
+                    Done
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] px-1 justify-center flex items-center gap-1"
+                    loading={actingFollowUp}
+                    onClick={() => handleFollowUpAction("postpone", 3)}
+                    title="Postpone follow-up by 3 days"
+                  >
+                    <CalendarPlus className="w-3 h-3" />
+                    +3d
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] px-1 justify-center text-[var(--muted)] hover:text-[var(--danger)] flex items-center gap-1"
+                    loading={actingFollowUp}
+                    onClick={() => handleFollowUpAction("dismiss")}
+                    title="Dismiss reminder"
+                  >
+                    <X className="w-3 h-3" />
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+
+              {application.followUpCompleted && !["Offer", "Rejected", "Withdrawn"].includes(application.status) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-xs text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 pt-1"
+                  loading={actingFollowUp}
+                  onClick={() => handleFollowUpAction("postpone", 7)}
+                  title="Schedule another follow-up in 7 days"
+                >
+                  <CalendarPlus className="w-3.5 h-3.5" />
+                  Schedule Next Follow-Up (+7d)
+                </Button>
+              )}
+
+              {application.followUpDismissed && !["Offer", "Rejected", "Withdrawn"].includes(application.status) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-xs text-[var(--muted)] hover:text-[var(--foreground)] flex items-center gap-1.5 pt-1"
+                  loading={actingFollowUp}
+                  onClick={() => handleFollowUpAction("postpone", 3)}
+                  title="Reactivate follow-up reminder"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Reactivate Reminder (+3d)
+                </Button>
+              )}
             </div>
           </Card>
 
@@ -332,6 +470,17 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
         cancelText="Keep Application"
         variant="danger"
         loading={deleting}
+      />
+
+      {/* Follow-Up Email Draft Generator Modal */}
+      <FollowUpDraftModal
+        isOpen={isDraftModalOpen}
+        onClose={() => setIsDraftModalOpen(false)}
+        application={application}
+        onMarkDone={async () => {
+          await handleFollowUpAction("complete");
+          setIsDraftModalOpen(false);
+        }}
       />
     </div>
   );

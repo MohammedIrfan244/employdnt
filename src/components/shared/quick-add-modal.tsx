@@ -6,6 +6,7 @@ import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { ICategory } from "@/types/category";
 
 interface QuickAddModalProps {
@@ -145,9 +146,10 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
           <button
             type="button"
             onClick={onClose}
-            className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded-md text-sm transition-colors"
+            className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded-md text-sm transition-colors cursor-pointer"
+            aria-label="Close modal"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -190,9 +192,19 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
             <button
               type="button"
               onClick={() => setShowOptional(!showOptional)}
-              className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors flex items-center gap-1"
+              className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <span>{showOptional ? "▾ Hide extra details" : "▸ Add extra details (salary, link, notes)"}</span>
+              {showOptional ? (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Hide extra details</span>
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                  <span>Add extra details (salary, link, notes)</span>
+                </>
+              )}
             </button>
 
             {showOptional && (
