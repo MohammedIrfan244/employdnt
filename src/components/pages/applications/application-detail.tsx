@@ -273,11 +273,23 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-amber-500/20 text-xs">
-                <span className="text-[11px] text-[var(--muted)]">
-                  {pendingEmail.suggestedStatus
-                    ? `Suggested status: ${pendingEmail.suggestedStatus}`
-                    : "Recruiter response detected"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--muted)]">
+                    {pendingEmail.suggestedStatus
+                      ? `Suggested status: ${pendingEmail.suggestedStatus}`
+                      : "Recruiter response detected"}
+                  </span>
+                  <a
+                    href={`https://mail.google.com/mail/u/${encodeURIComponent(pendingEmail.userEmail || "")}/#all/${pendingEmail.threadId || pendingEmail.messageId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-[var(--accent-text)] hover:underline flex items-center gap-0.5 ml-1"
+                    title="Open email in Gmail (new tab)"
+                  >
+                    <span>Open in Gmail</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
 
                 <div className="flex items-center gap-2 self-end sm:self-auto">
                   <Button

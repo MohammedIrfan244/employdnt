@@ -42,6 +42,121 @@ function parseSender(fromHeader: string): { senderName: string; senderEmail: str
 }
 
 /**
+ * Detects marketing, promotional newsletters, job alert digests, and non-employment applications.
+ */
+export function isAdvertisementOrSpam(
+  subject: string,
+  snippet: string,
+  senderEmail: string,
+  senderName: string
+): boolean {
+  const text = `${subject} ${snippet}`.toLowerCase();
+  const sender = `${senderEmail} ${senderName}`.toLowerCase();
+
+  // 1. Promotional / marketing sales, discounts & commercial offers
+  const promoKeywords = [
+    "discount",
+    "% off",
+    "coupon",
+    "special offer",
+    "exclusive offer",
+    "limited time offer",
+    "limited-time offer",
+    "sale ends",
+    "black friday",
+    "cyber monday",
+    "cashback",
+    "gift card",
+    "promo code",
+    "voucher",
+    "pricing plan",
+    "free trial",
+    "upgrade your account",
+    "save up to",
+    "best deal",
+    "shop now",
+    "earn cash",
+  ];
+  if (promoKeywords.some((kw) => text.includes(kw))) {
+    return true;
+  }
+
+  // 2. Job aggregator automated newsletters, digests & alert blasts
+  const alertKeywords = [
+    "job alert",
+    "job alerts",
+    "jobs matching your",
+    "jobs for you",
+    "recommended jobs",
+    "jobs you may be interested in",
+    "jobs you might like",
+    "suggested jobs",
+    "weekly job digest",
+    "daily job alert",
+    "top picks for you",
+    "apply to these jobs",
+    "companies are hiring",
+    "urgent hiring for",
+    "hot jobs for",
+    "explore new opportunities on",
+    "see jobs for",
+    "new job matches",
+    "based on your profile",
+    "weekly alert",
+  ];
+  if (alertKeywords.some((kw) => text.includes(kw))) {
+    return true;
+  }
+
+  // 3. Known newsletter/aggregator bot senders
+  const botSenders = [
+    "jobalerts-noreply@linkedin.com",
+    "newsletters-noreply@linkedin.com",
+    "invitations@linkedin.com",
+    "alert@indeed.com",
+    "alerts@indeed.com",
+    "jobalerts@naukri.com",
+    "info@naukri.com",
+    "noreply@glassdoor.com",
+    "jobs@glassdoor.com",
+    "alerts@ziprecruiter.com",
+    "mailer@ziprecruiter.com",
+    "marketing@",
+    "newsletter@",
+    "promotions@",
+    "noreply@medium.com",
+    "digest@",
+  ];
+  if (botSenders.some((bot) => sender.includes(bot))) {
+    return true;
+  }
+
+  // 4. Non-employment applications
+  const nonJobApps = [
+    "credit card application",
+    "loan application",
+    "mortgage application",
+    "passport application",
+    "visa application",
+    "grant application",
+    "patent application",
+    "membership application",
+    "rental application",
+    "web application",
+    "mobile application",
+    "application security",
+    "application performance",
+    "application monitoring",
+    "cloud application",
+  ];
+  if (nonJobApps.some((kw) => text.includes(kw))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Classifies recruitment email intent using domain heuristics (Module 4.2).
  */
 function classifyEmail(subject: string, snippet: string): {
@@ -50,12 +165,16 @@ function classifyEmail(subject: string, snippet: string): {
 } {
   const text = `${subject} ${snippet}`.toLowerCase();
 
-  // 1. Offer
+  // 1. Employment Offer (must be formal job/employment offer, not a promotional offer)
   if (
     text.includes("offer letter") ||
     text.includes("formal offer") ||
     text.includes("pleased to offer") ||
-    text.includes("job offer")
+    text.includes("job offer") ||
+    text.includes("employment offer") ||
+    text.includes("offer of employment") ||
+    text.includes("extend an offer") ||
+    text.includes("conditional offer of employment")
   ) {
     return { category: "offer", suggestedStatus: "Offer" };
   }
@@ -186,29 +305,58 @@ function matchEmailToApplications(
 }
 
 /**
- * Scans user's Gmail inbox for recent recruitment emails.
+ * Automatically purges any previously stored marketing/spam emails from pending.
  */
-export async function scanUserGmail(userEmail: string): Promise<{
+export async function cleanSpamDetectedEmails(userEmail: string): Promise<number> {
+  await connectDB();
+  const pending = await DetectedEmail.find({ userEmail, status: "pending" });
+  let cleanedCount = 0;
+  for (const email of pending) {
+    if (
+      isAdvertisementOrSpam(email.subject, email.snippet, email.senderEmail, email.senderName || "") ||
+      (email.category === "other" && !email.matchedApplicationId)
+    ) {
+      await DetectedEmail.deleteOne({ _id: email._id });
+      cleanedCount++;
+    }
+  }
+  return cleanedCount;
+}
+
+/**
+ * Scans user's Gmail inbox for recent recruitment emails.
+ * Uses batch filtering and parallel metadata fetching for high performance.
+ */
+export async function scanUserGmail(
+  userEmail: string,
+  options: { maxResults?: number } = {}
+): Promise<{
   success: boolean;
   scanned: number;
   newDetected: number;
+  hasMore?: boolean;
   error?: string;
 }> {
   await connectDB();
+
+  // Purge any existing marketing/spam that slipped into pending previously
+  await cleanSpamDetectedEmails(userEmail);
 
   const accessToken = await getValidGmailAccessToken(userEmail);
   if (!accessToken) {
     return { success: false, scanned: 0, newDetected: 0, error: "Gmail is not connected or token expired" };
   }
 
-  // Targeted query to surface only recruitment emails (Module 4.2)
+  const limit = Math.min(Math.max(options.maxResults || 50, 10), 100);
+
+  // Targeted query to surface only genuine recruitment emails (Module 4.2)
   const query = encodeURIComponent(
-    'subject:(application OR interview OR offer OR "status of your application" OR "thank you for applying" OR "update on your application" OR "next steps" OR "job application") -category:promotions -category:social'
+    'subject:(application OR interview OR "job offer" OR "offer letter" OR "status of your application" OR "thank you for applying" OR "update on your application" OR "next steps" OR "job application") -category:promotions -category:social -subject:(newsletter OR digest OR "job alert" OR "jobs for you" OR "recommended jobs" OR discount OR "sale" OR webinar)'
   );
 
   try {
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=20`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=${limit}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
@@ -229,8 +377,17 @@ export async function scanUserGmail(userEmail: string): Promise<{
 
     if (messages.length === 0) {
       await User.updateOne({ email: userEmail }, { $set: { gmailLastSyncedAt: new Date() } });
-      return { success: true, scanned: 0, newDetected: 0 };
+      return { success: true, scanned: 0, newDetected: 0, hasMore: false };
     }
+
+    // Single query to identify already-processed emails
+    const existingEmails = await DetectedEmail.find({
+      userEmail,
+      messageId: { $in: messages.map((m) => m.id) },
+    }).select("messageId").lean();
+
+    const existingSet = new Set(existingEmails.map((e) => e.messageId));
+    const newMessages = messages.filter((m) => !existingSet.has(m.id));
 
     // Fetch existing active applications to match against
     const applications = await Application.find({
@@ -239,65 +396,82 @@ export async function scanUserGmail(userEmail: string): Promise<{
 
     let newDetectedCount = 0;
 
-    for (const msg of messages) {
-      // Check if already processed
-      const exists = await DetectedEmail.findOne({ userEmail, messageId: msg.id });
-      if (exists) continue;
+    // Fetch message metadata in concurrent chunks (5 concurrent requests)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < newMessages.length; i += BATCH_SIZE) {
+      const chunk = newMessages.slice(i, i + BATCH_SIZE);
 
-      // Fetch message metadata (headers + snippet)
-      const detailRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
+      await Promise.all(
+        chunk.map(async (msg) => {
+          try {
+            const detailRes = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+              {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              }
+            );
+
+            if (!detailRes.ok) return;
+
+            const detail: GmailMessageResponse = await detailRes.json();
+            const headers = detail.payload?.headers || [];
+
+            const subject = headers.find((h) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
+            const fromHeader = headers.find((h) => h.name.toLowerCase() === "from")?.value || "";
+            const dateHeader = headers.find((h) => h.name.toLowerCase() === "date")?.value;
+
+            const receivedAt = dateHeader ? new Date(dateHeader) : new Date();
+            const snippet = detail.snippet || "";
+            const { senderName, senderEmail } = parseSender(fromHeader);
+
+            // 1. Skip if identified as advertisement, commercial promo, or job alert newsletter
+            if (isAdvertisementOrSpam(subject, snippet, senderEmail, senderName)) {
+              return;
+            }
+
+            // 2. Classify email intent
+            const { category, suggestedStatus } = classifyEmail(subject, snippet);
+
+            // 3. Match against applications
+            const { matchedApp, confidence, reason } = matchEmailToApplications(
+              subject,
+              snippet,
+              senderEmail,
+              senderName,
+              JSON.parse(JSON.stringify(applications))
+            );
+
+            // 4. If category is "other" and it does NOT match any application, skip saving
+            if (category === "other" && !matchedApp) {
+              return;
+            }
+
+            await DetectedEmail.create({
+              userEmail,
+              messageId: msg.id,
+              threadId: msg.threadId,
+              sender: fromHeader,
+              senderEmail,
+              senderName,
+              subject,
+              snippet,
+              receivedAt,
+              category,
+              matchedApplicationId: matchedApp?._id || null,
+              matchedCompany: matchedApp?.company || undefined,
+              matchedRole: matchedApp?.role || undefined,
+              matchConfidence: confidence,
+              matchReason: reason,
+              suggestedStatus,
+              status: "pending",
+            });
+
+            newDetectedCount++;
+          } catch {
+            // Ignore individual message failure to preserve overall sync
+          }
+        })
       );
-
-      if (!detailRes.ok) continue;
-
-      const detail: GmailMessageResponse = await detailRes.json();
-      const headers = detail.payload?.headers || [];
-
-      const subject = headers.find((h) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
-      const fromHeader = headers.find((h) => h.name.toLowerCase() === "from")?.value || "";
-      const dateHeader = headers.find((h) => h.name.toLowerCase() === "date")?.value;
-
-      const receivedAt = dateHeader ? new Date(dateHeader) : new Date();
-      const snippet = detail.snippet || "";
-      const { senderName, senderEmail } = parseSender(fromHeader);
-
-      // Classify email intent
-      const { category, suggestedStatus } = classifyEmail(subject, snippet);
-
-      // Match against applications
-      const { matchedApp, confidence, reason } = matchEmailToApplications(
-        subject,
-        snippet,
-        senderEmail,
-        senderName,
-        JSON.parse(JSON.stringify(applications))
-      );
-
-      await DetectedEmail.create({
-        userEmail,
-        messageId: msg.id,
-        threadId: msg.threadId,
-        sender: fromHeader,
-        senderEmail,
-        senderName,
-        subject,
-        snippet,
-        receivedAt,
-        category,
-        matchedApplicationId: matchedApp?._id || null,
-        matchedCompany: matchedApp?.company || undefined,
-        matchedRole: matchedApp?.role || undefined,
-        matchConfidence: confidence,
-        matchReason: reason,
-        suggestedStatus,
-        status: "pending",
-      });
-
-      newDetectedCount++;
     }
 
     await User.updateOne({ email: userEmail }, { $set: { gmailLastSyncedAt: new Date() } });
@@ -306,6 +480,7 @@ export async function scanUserGmail(userEmail: string): Promise<{
       success: true,
       scanned: messages.length,
       newDetected: newDetectedCount,
+      hasMore: Boolean(listData.nextPageToken),
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Unexpected error scanning Gmail";
@@ -322,6 +497,11 @@ export async function getDetectedEmails(
 ): Promise<IDetectedEmail[]> {
   await connectDB();
 
+  // Clean up any spam/marketing emails that might have previously slipped into pending
+  if (!options.status || options.status === "pending") {
+    await cleanSpamDetectedEmails(userEmail);
+  }
+
   const query: Record<string, unknown> = { userEmail };
   if (options.status) {
     query.status = options.status;
@@ -330,7 +510,7 @@ export async function getDetectedEmails(
   const emails = await DetectedEmail.find(query)
     .populate("matchedApplicationId", "company role status appliedDate")
     .sort({ receivedAt: -1 })
-    .limit(options.limit || 20)
+    .limit(options.limit || 50)
     .lean();
 
   return JSON.parse(JSON.stringify(emails));
