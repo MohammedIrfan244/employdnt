@@ -4,7 +4,17 @@ import { syncUserOnLogin } from "@/services/user.service";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
+    // 1. Standard Google Sign-In (basic profile only, never blocked by restricted scope checks)
     Google({
+      id: "google",
+      name: "Google",
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+    // 2. Dedicated Gmail connection provider (requests gmail.readonly + offline refresh token)
+    Google({
+      id: "google-gmail",
+      name: "Google Gmail",
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
       authorization: {
@@ -24,7 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    async jwt({ token, account, user }) {
+    async jwt({ token, account }) {
       if (account && token.email) {
         token.accessToken = account.access_token;
 

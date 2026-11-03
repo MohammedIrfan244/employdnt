@@ -80,7 +80,7 @@ export default function SettingsView() {
   };
 
   const handleConnectGmail = () => {
-    signIn("google", { callbackUrl: "/settings" });
+    signIn("google-gmail", { callbackUrl: "/settings" });
   };
 
   const handleDisconnectConfirm = async () => {
