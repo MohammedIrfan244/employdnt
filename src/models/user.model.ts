@@ -26,6 +26,28 @@ const UserSchema = new Schema<IUser>(
       type: Number,
       default: DEFAULT_FOLLOW_UP_DAYS,
     },
+    // Gmail integration fields
+    gmailConnected: {
+      type: Boolean,
+      default: false,
+    },
+    gmailEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    gmailAccessToken: {
+      type: String,
+    },
+    gmailRefreshToken: {
+      type: String,
+    },
+    gmailTokenExpiresAt: {
+      type: Number,
+    },
+    gmailLastSyncedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -34,4 +56,3 @@ const UserSchema = new Schema<IUser>(
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
-

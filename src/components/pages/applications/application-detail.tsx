@@ -15,6 +15,7 @@ import { ArrowLeft, Trash2, ExternalLink, Mail, Check, CalendarPlus, X, Clock } 
 import { ApplicationStatus } from "@/lib/constants";
 import { IApplication } from "@/types/application";
 import { IApplicationEvent } from "@/types/application-event";
+import { IDetectedEmail } from "@/types/detected-email";
 
 interface ApplicationDetailProps {
   id: string;
@@ -34,16 +35,36 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
   const [actingFollowUp, setActingFollowUp] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<IDetectedEmail | null>(null);
+  const [emailActing, setEmailActing] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/applications/${id}`);
-      const json = await res.json();
-      if (json.success && json.data) {
-        setApplication(json.data.application);
-        setTimeline(json.data.timeline || []);
-        setNotesValue(json.data.application.notes || "");
+      const [appRes, emailRes] = await Promise.all([
+        fetch(`/api/applications/${id}`),
+        fetch("/api/gmail/emails?status=pending"),
+      ]);
+
+      const [appJson, emailJson] = await Promise.all([
+        appRes.json(),
+        emailRes.json().catch(() => ({})),
+      ]);
+
+      if (appJson.success && appJson.data) {
+        setApplication(appJson.data.application);
+        setTimeline(appJson.data.timeline || []);
+        setNotesValue(appJson.data.application.notes || "");
+      }
+
+      if (emailJson.success && Array.isArray(emailJson.data)) {
+        const match = emailJson.data.find(
+          (e: IDetectedEmail) =>
+            (typeof e.matchedApplicationId === "object" && e.matchedApplicationId !== null
+              ? (e.matchedApplicationId as { _id?: string })._id?.toString()
+              : e.matchedApplicationId?.toString()) === id
+        );
+        setPendingEmail(match || null);
       }
     } catch {
       // silent
@@ -130,6 +151,45 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
     }
   };
 
+  const handleConfirmPendingEmail = async (applySuggestedStatus: boolean) => {
+    if (!pendingEmail) return;
+    setEmailActing(true);
+    try {
+      const res = await fetch(`/api/gmail/emails/${pendingEmail._id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applySuggestedStatus, applicationId: id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPendingEmail(null);
+        await loadData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setEmailActing(false);
+    }
+  };
+
+  const handleDismissPendingEmail = async () => {
+    if (!pendingEmail) return;
+    setEmailActing(true);
+    try {
+      const res = await fetch(`/api/gmail/emails/${pendingEmail._id}/dismiss`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPendingEmail(null);
+      }
+    } catch {
+      // silent
+    } finally {
+      setEmailActing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-12 rounded-2xl bg-[var(--surface)] border border-[var(--border)] text-center text-xs text-[var(--muted)] animate-pulse">
@@ -182,6 +242,83 @@ export default function ApplicationDetail({ id }: ApplicationDetailProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Primary Section (8 cols on lg) */}
         <div className="lg:col-span-8 space-y-6">
+          {/* Detected Recruiter Email Banner (Module 4.4, 4.5) */}
+          {pendingEmail && (
+            <Card className="p-4 border-amber-500/40 bg-amber-950/15 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <Mail className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-[var(--foreground)]">
+                      New recruitment email detected: &ldquo;{pendingEmail.subject}&rdquo;
+                    </p>
+                    <p className="text-[11px] text-[var(--muted)] line-clamp-2 italic">
+                      &ldquo;{pendingEmail.snippet}&rdquo;
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    pendingEmail.category === "interview"
+                      ? "progress"
+                      : pendingEmail.category === "offer"
+                      ? "offer"
+                      : pendingEmail.category === "rejection"
+                      ? "rejected"
+                      : "applied"
+                  }
+                >
+                  {pendingEmail.category.toUpperCase()}
+                </Badge>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-amber-500/20 text-xs">
+                <span className="text-[11px] text-[var(--muted)]">
+                  {pendingEmail.suggestedStatus
+                    ? `Suggested status: ${pendingEmail.suggestedStatus}`
+                    : "Recruiter response detected"}
+                </span>
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={emailActing}
+                    onClick={handleDismissPendingEmail}
+                    className="text-xs text-[var(--muted)] hover:text-red-400"
+                  >
+                    Dismiss
+                  </Button>
+
+                  {pendingEmail.suggestedStatus ? (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      loading={emailActing}
+                      onClick={() => handleConfirmPendingEmail(true)}
+                      className="text-xs font-semibold shadow-xs"
+                    >
+                      Confirm &amp; Set to {pendingEmail.suggestedStatus}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={emailActing}
+                      onClick={() => handleConfirmPendingEmail(false)}
+                      className="text-xs"
+                    >
+                      Link Email to Timeline
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Main Info Card */}
           <Card className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-[var(--border)]">

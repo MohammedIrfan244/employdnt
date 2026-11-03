@@ -7,10 +7,11 @@ import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Badge, { getStatusBadgeVariant } from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
-import { Clock, Briefcase, Check, Mail, ArrowRight, ArrowUpRight } from "lucide-react";
+import { Clock, Briefcase, Check, Mail, ArrowRight, ArrowUpRight, RefreshCw } from "lucide-react";
 import { ICategory } from "@/types/category";
 import { IDailyProgress } from "@/types/daily-progress";
 import { IApplication } from "@/types/application";
+import { IDetectedEmail } from "@/types/detected-email";
 
 interface CategoryProgressItem {
   category: ICategory;
@@ -23,24 +24,29 @@ export default function Today() {
   const [categoriesProgress, setCategoriesProgress] = useState<CategoryProgressItem[]>([]);
   const [needsAttention, setNeedsAttention] = useState<IApplication[]>([]);
   const [recentApplications, setRecentApplications] = useState<IApplication[]>([]);
+  const [detectedEmails, setDetectedEmails] = useState<IDetectedEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [draftApp, setDraftApp] = useState<IApplication | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [syncingGmail, setSyncingGmail] = useState(false);
+  const [emailActionId, setEmailActionId] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     if (!todayString) return;
 
     try {
-      const [progRes, attnRes, recentRes] = await Promise.all([
+      const [progRes, attnRes, recentRes, emailRes] = await Promise.all([
         fetch(`/api/progress/today?clientDate=${encodeURIComponent(todayString)}`),
         fetch(`/api/follow-up?clientDate=${encodeURIComponent(todayString)}`),
         fetch("/api/applications?recent=true&limit=8"),
+        fetch("/api/gmail/emails?status=pending&limit=5"),
       ]);
 
-      const [progData, attnData, recentData] = await Promise.all([
+      const [progData, attnData, recentData, emailData] = await Promise.all([
         progRes.json(),
         attnRes.json(),
         recentRes.json(),
+        emailRes.json().catch(() => ({})),
       ]);
 
       if (progData.success) {
@@ -54,6 +60,9 @@ export default function Today() {
       }
       if (recentData.success) {
         setRecentApplications(recentData.data || []);
+      }
+      if (emailData?.success && Array.isArray(emailData.data)) {
+        setDetectedEmails(emailData.data);
       }
     } catch {
       // silent
@@ -84,6 +93,58 @@ export default function Today() {
       // silent
     } finally {
       setActioningId(null);
+    }
+  };
+
+  const handleConfirmEmail = async (emailId: string, applySuggestedStatus: boolean) => {
+    setEmailActionId(emailId);
+    try {
+      const res = await fetch(`/api/gmail/emails/${emailId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applySuggestedStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDetectedEmails((prev) => prev.filter((e) => e._id?.toString() !== emailId));
+        await fetchDashboardData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setEmailActionId(null);
+    }
+  };
+
+  const handleDismissEmail = async (emailId: string) => {
+    setEmailActionId(emailId);
+    try {
+      const res = await fetch(`/api/gmail/emails/${emailId}/dismiss`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDetectedEmails((prev) => prev.filter((e) => e._id?.toString() !== emailId));
+      }
+    } catch {
+      // silent
+    } finally {
+      setEmailActionId(null);
+    }
+  };
+
+  const handleManualScanGmail = async () => {
+    setSyncingGmail(true);
+    try {
+      const res = await fetch("/api/gmail/sync", { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        await fetchDashboardData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setSyncingGmail(false);
     }
   };
 
@@ -257,6 +318,127 @@ export default function Today() {
 
         {/* Right Area: Follow-ups due + Journey Summary (4 cols on lg, 4 on xl, 3 on 2xl) */}
         <div className="lg:col-span-4 2xl:col-span-3 space-y-5">
+          {/* Detected Emails Card (Module 4.4, 4.5) */}
+          {detectedEmails.length > 0 && (
+            <Card className="space-y-3.5 border-emerald-500/30 bg-emerald-950/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                    Recruiter Updates ({detectedEmails.length})
+                  </h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleManualScanGmail}
+                  disabled={syncingGmail}
+                  className="text-[11px] p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+                  title="Scan Gmail for new recruitment updates"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingGmail ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+
+              <div className="space-y-2.5">
+                {detectedEmails.map((email) => {
+                  const isActing = emailActionId === email._id?.toString();
+                  const matchedApp =
+                    typeof email.matchedApplicationId === "object" && email.matchedApplicationId !== null
+                      ? (email.matchedApplicationId as IApplication)
+                      : null;
+                  const company = matchedApp?.company || email.matchedCompany || "Unknown Company";
+                  const role = matchedApp?.role || email.matchedRole || "";
+
+                  return (
+                    <div
+                      key={email._id?.toString()}
+                      className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-[var(--foreground)] truncate">
+                              {company}
+                            </span>
+                            {role && <span className="text-[var(--muted)] truncate">• {role}</span>}
+                          </div>
+                          <p className="text-[11px] text-[var(--accent-text)] font-medium truncate mt-0.5">
+                            {email.subject}
+                          </p>
+                        </div>
+
+                        <Badge
+                          variant={
+                            email.category === "interview"
+                              ? "progress"
+                              : email.category === "offer"
+                              ? "offer"
+                              : email.category === "rejection"
+                              ? "rejected"
+                              : "applied"
+                          }
+                        >
+                          {email.category.toUpperCase()}
+                        </Badge>
+                      </div>
+
+                      <p className="text-[11px] text-[var(--muted)] line-clamp-2 italic leading-relaxed">
+                        &quot;{email.snippet}&quot;
+                      </p>
+
+                      {email.suggestedStatus && (
+                        <p className="text-[11px] text-amber-400 font-medium">
+                          Suggested Status: {email.suggestedStatus}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] truncate max-w-[130px]">
+                          {email.matchReason || `${email.matchConfidence} match`}
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isActing}
+                            onClick={() => handleDismissEmail(email._id!.toString())}
+                            className="text-[11px] py-0.5 px-2 text-[var(--muted)] hover:text-red-400"
+                          >
+                            Dismiss
+                          </Button>
+
+                          {email.suggestedStatus ? (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={isActing}
+                              onClick={() => handleConfirmEmail(email._id!.toString(), true)}
+                              className="text-[11px] py-0.5 px-2.5 font-semibold shadow-xs"
+                            >
+                              Set to {email.suggestedStatus}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={isActing}
+                              onClick={() => handleConfirmEmail(email._id!.toString(), false)}
+                              className="text-[11px] py-0.5 px-2.5 font-semibold"
+                            >
+                              Link Email
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* Follow-up attention card */}
           <Card className="space-y-3.5">
             <div className="flex items-center justify-between">

@@ -6,16 +6,16 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ## Current Status Overview
 
-- **Active Phase:** Phase 2 — Follow-Up Assistant (Complete) ➔ Ready for Phase 3: Gmail Integration
-- **Active Step:** Phase 2 Verification & Review on `follow-up` feature branch
-- **Current Milestone:** Automated follow-up scheduling, Due/Overdue queue, Draft Generator (3 tones, mailto/copy), and Follow-up Management View fully operational.
+- **Active Phase:** Phase 3 — Gmail Integration (Complete) ➔ Ready for Phase 4: Supporting Modules
+- **Active Step:** Phase 3 Verification on `g-mail` feature branch
+- **Current Milestone:** OAuth read-only scope, targeted recruitment email scanner, smart application matching engine, status transition proposals, and Settings Gmail connection management operational.
 
 | Phase | Description | Reference (`plan.md`) | Status |
 |---|---|---|---|
 | **Phase 1** | Core Application (CRUD, Categories, Progressive Goals, Dashboard) | Modules 1, 2, 5, 9, 11 | **COMPLETED** ✅ |
 | **Phase 2** | Follow-Up Assistant (Auto-scheduling, Needs Attention, Drafts) | Modules 1.4, 3, 8 | **COMPLETED** ✅ |
-| **Phase 3** | Gmail Integration (OAuth, detection, matching, alerts) | Modules 4, 8 | **NEXT UP** 🟡 |
-| **Phase 4** | Supporting Modules (Profile, Resumes, Resources, Settings) | Modules 6, 7, 10 | PENDING ⚪ |
+| **Phase 3** | Gmail Integration (OAuth, detection, matching, alerts) | Modules 4, 8 | **COMPLETED** ✅ |
+| **Phase 4** | Supporting Modules (Profile, Resumes, Resources, Settings) | Modules 6, 7, 10 | **NEXT UP** 🟡 |
 | **Phase 5** | Polish & Optimization (Responsive, accessibility, error handling) | Modules 9.4, 12 | PENDING ⚪ |
 
 ---
@@ -115,12 +115,25 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ---
 
-## Phase 3: Gmail Integration ⚪ (PENDING)
+## Phase 3: Gmail Integration ✅ (COMPLETED)
 *(Ref: docs/plan.md Module 4)*
-- [ ] Google OAuth connection for reading relevant job emails.
-- [ ] Recruitment email heuristic scanner (acknowledgments, interview requests, rejections).
-- [ ] Application matching engine with confidence rating & user confirmation workflow.
-- [ ] Suggested status transitions (user confirms).
+- [x] **OAuth Read-Only Scope & Token Lifecycle ([src/auth.ts](file:///d:/myprojects/employdnt/src/auth.ts), [src/services/user.service.ts](file:///d:/myprojects/employdnt/src/services/user.service.ts)):**
+  - Integrated `https://www.googleapis.com/auth/gmail.readonly` with `access_type: "offline"` and automatic token refresh via Google's OAuth token endpoint.
+  - Persisted tokens on `User` model with disconnect support.
+- [x] **Recruitment Email Scanner & Data Model ([src/models/detected-email.model.ts](file:///d:/myprojects/employdnt/src/models/detected-email.model.ts), [src/services/gmail.service.ts](file:///d:/myprojects/employdnt/src/services/gmail.service.ts)):**
+  - Targeted queries filtering out promotions and social mail.
+  - Domain classification engine identifying *Interviews*, *Offers*, *Rejections*, *Acknowledgments*, and *Inquiries*.
+  - Strict privacy compliance: stores only headers and brief snippets, never full inboxes.
+- [x] **Application Matching Engine ([src/services/gmail.service.ts](file:///d:/myprojects/employdnt/src/services/gmail.service.ts)):**
+  - Multi-signal matching (recruiter email, exact company name, role name, sender domain).
+  - Confidence scoring (`high`, `medium`, `low`, `none`).
+- [x] **User Confirmation & Status Transitions:**
+  - Automated status suggestions (Interview, Rejected, Offer) requiring explicit user confirmation.
+  - Confirmation logs `EMAIL_LINKED` and `STATUS_CHANGED` events to the application's chronological timeline.
+- [x] **UI Integration & Controls:**
+  - **Settings View ([src/components/pages/settings/settings-view.tsx](file:///d:/myprojects/employdnt/src/components/pages/settings/settings-view.tsx)):** Gmail connect/disconnect controls, manual "Sync Now" trigger, and privacy disclosures.
+  - **Today Dashboard ([src/components/pages/today/today.tsx](file:///d:/myprojects/employdnt/src/components/pages/today/today.tsx)):** Real-time "Recruiter Updates" card with quick confirmation/dismissal actions.
+  - **Application Detail ([src/components/pages/applications/application-detail.tsx](file:///d:/myprojects/employdnt/src/components/pages/applications/application-detail.tsx)):** Banner for detected emails with status transition shortcuts and linked timeline activity.
 
 ---
 
