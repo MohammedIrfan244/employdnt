@@ -39,5 +39,9 @@ const CategorySchema = new Schema<ICategory>(
 // Ensure uniqueness of category name per user
 CategorySchema.index({ userEmail: 1, name: 1 }, { unique: true });
 
+if (process.env.NODE_ENV !== "production") {
+  delete (mongoose.models as Record<string, unknown>).Category;
+}
+
 export const Category: Model<ICategory> =
   mongoose.models.Category || mongoose.model<ICategory>("Category", CategorySchema);

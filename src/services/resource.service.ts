@@ -54,9 +54,12 @@ const STARTER_RESOURCES: Array<{
 
 export async function ensureStarterResources(userEmail: string): Promise<void> {
   await connectDB();
-  const count = await Resource.countDocuments({ userEmail });
+  const email = userEmail.toLowerCase().trim();
+  const count = await Resource.countDocuments({
+    $or: [{ userEmail: email }, { userEmail }],
+  });
   if (count === 0) {
-    const seeded = STARTER_RESOURCES.map((r) => ({ ...r, userEmail }));
+    const seeded = STARTER_RESOURCES.map((r) => ({ ...r, userEmail: email }));
     await Resource.insertMany(seeded);
   }
 }
@@ -66,9 +69,12 @@ export async function getResources(
   category?: string
 ): Promise<IResource[]> {
   await connectDB();
-  await ensureStarterResources(userEmail);
+  const email = userEmail.toLowerCase().trim();
+  await ensureStarterResources(email);
 
-  const query: Record<string, unknown> = { userEmail };
+  const query: Record<string, unknown> = {
+    $or: [{ userEmail: email }, { userEmail }],
+  };
   if (category && category !== "All") {
     query.category = category;
   }
@@ -92,6 +98,7 @@ export async function createResource(
   }
 ): Promise<IResource> {
   await connectDB();
+  const email = userEmail.toLowerCase().trim();
 
   let formattedUrl = data.url.trim();
   if (!/^https?:\/\//i.test(formattedUrl)) {
@@ -99,7 +106,7 @@ export async function createResource(
   }
 
   const created = await Resource.create({
-    userEmail,
+    userEmail: email,
     title: data.title.trim(),
     url: formattedUrl,
     category: data.category,
@@ -117,6 +124,7 @@ export async function updateResource(
   data: Partial<IResource>
 ): Promise<IResource | null> {
   await connectDB();
+  const email = userEmail.toLowerCase().trim();
 
   if (data.url) {
     let formattedUrl = data.url.trim();
@@ -127,7 +135,7 @@ export async function updateResource(
   }
 
   const updated = await Resource.findOneAndUpdate(
-    { _id: id, userEmail },
+    { _id: id, $or: [{ userEmail: email }, { userEmail }] },
     { $set: data },
     { new: true, runValidators: true }
   ).lean();
@@ -137,7 +145,10 @@ export async function updateResource(
 
 export async function deleteResource(id: string, userEmail: string): Promise<boolean> {
   await connectDB();
-  const res = await Resource.deleteOne({ _id: id, userEmail });
+  const email = userEmail.toLowerCase().trim();
+  const res = await Resource.deleteOne({
+    _id: id,
+    $or: [{ userEmail: email }, { userEmail }],
+  });
   return res.deletedCount > 0;
 }
-

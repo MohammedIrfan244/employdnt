@@ -4,7 +4,10 @@ import { IUser } from "@/types/user";
 
 export async function getUserProfile(userEmail: string): Promise<IUser | null> {
   await connectDB();
-  const user = await User.findOne({ email: userEmail }).lean();
+  const normalized = userEmail.toLowerCase().trim();
+  const user = await User.findOne({
+    $or: [{ email: normalized }, { email: userEmail }],
+  }).lean();
   return user ? JSON.parse(JSON.stringify(user)) : null;
 }
 
@@ -13,6 +16,7 @@ export async function updateUserProfile(
   data: Partial<IUser>
 ): Promise<IUser | null> {
   await connectDB();
+  const normalized = userEmail.toLowerCase().trim();
   const allowedUpdates: Partial<IUser> = {
     name: data.name?.trim(),
     headline: data.headline?.trim(),
@@ -34,12 +38,24 @@ export async function updateUserProfile(
     }
   });
 
-  const updated = await User.findOneAndUpdate(
-    { email: userEmail },
-    { $set: allowedUpdates },
-    { new: true, runValidators: true }
-  ).lean();
+  const existing = await User.findOne({
+    $or: [{ email: normalized }, { email: userEmail }],
+  });
+
+  let updated;
+  if (existing) {
+    updated = await User.findByIdAndUpdate(
+      existing._id,
+      { $set: { email: normalized, ...allowedUpdates } },
+      { returnDocument: "after", runValidators: true }
+    ).lean();
+  } else {
+    const created = await User.create({
+      email: normalized,
+      ...allowedUpdates,
+    });
+    updated = created.toObject ? created.toObject() : created;
+  }
 
   return updated ? JSON.parse(JSON.stringify(updated)) : null;
 }
-

@@ -45,5 +45,9 @@ const DailyProgressSchema = new Schema<IDailyProgress>(
 // Ensure only one progress document exists per user per category per client date
 DailyProgressSchema.index({ userEmail: 1, categoryId: 1, date: 1 }, { unique: true });
 
+if (process.env.NODE_ENV !== "production") {
+  delete (mongoose.models as Record<string, unknown>).DailyProgress;
+}
+
 export const DailyProgress: Model<IDailyProgress> =
   mongoose.models.DailyProgress || mongoose.model<IDailyProgress>("DailyProgress", DailyProgressSchema);

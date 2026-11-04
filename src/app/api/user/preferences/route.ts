@@ -7,21 +7,36 @@ import { DEFAULT_FOLLOW_UP_DAYS, DEFAULT_INITIAL_TARGET } from "@/lib/constants"
 export async function GET() {
   try {
     const session = await auth();
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
+    const rawEmail = session?.user?.email;
+    if (!rawEmail) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const email = rawEmail.toLowerCase().trim();
     await connectDB();
-    const user = await User.findOne({ email: userEmail }).lean();
+    const user = await User.findOne({
+      $or: [{ email }, { email: rawEmail }],
+    }).lean();
 
     return NextResponse.json({
       success: true,
       data: {
-        defaultFollowUpDays: user?.defaultFollowUpDays || DEFAULT_FOLLOW_UP_DAYS,
-        notifyEmailDetected: user?.notifyEmailDetected ?? true,
-        notifyFollowUpDue: user?.notifyFollowUpDue ?? true,
-        targetDailyApplications: user?.targetDailyApplications || DEFAULT_INITIAL_TARGET,
+        defaultFollowUpDays:
+          typeof user?.defaultFollowUpDays === "number"
+            ? user.defaultFollowUpDays
+            : DEFAULT_FOLLOW_UP_DAYS,
+        notifyEmailDetected:
+          typeof user?.notifyEmailDetected === "boolean"
+            ? user.notifyEmailDetected
+            : true,
+        notifyFollowUpDue:
+          typeof user?.notifyFollowUpDue === "boolean"
+            ? user.notifyFollowUpDue
+            : true,
+        targetDailyApplications:
+          typeof user?.targetDailyApplications === "number"
+            ? user.targetDailyApplications
+            : DEFAULT_INITIAL_TARGET,
       },
     });
   } catch (error: unknown) {
@@ -33,11 +48,12 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const session = await auth();
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
+    const rawEmail = session?.user?.email;
+    if (!rawEmail) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const email = rawEmail.toLowerCase().trim();
     const body = await req.json();
     await connectDB();
 
@@ -55,19 +71,44 @@ export async function PUT(req: NextRequest) {
       updateFields.targetDailyApplications = Math.max(1, Math.min(50, body.targetDailyApplications));
     }
 
-    const updated = await User.findOneAndUpdate(
-      { email: userEmail },
-      { $set: updateFields },
-      { new: true }
-    ).lean();
+    const existing = await User.findOne({
+      $or: [{ email }, { email: rawEmail }],
+    });
+
+    let updated;
+    if (existing) {
+      updated = await User.findByIdAndUpdate(
+        existing._id,
+        { $set: { email, ...updateFields } },
+        { returnDocument: "after", runValidators: true }
+      ).lean();
+    } else {
+      const created = await User.create({
+        email,
+        ...updateFields,
+      });
+      updated = created.toObject ? created.toObject() : created;
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        defaultFollowUpDays: updated?.defaultFollowUpDays || DEFAULT_FOLLOW_UP_DAYS,
-        notifyEmailDetected: updated?.notifyEmailDetected ?? true,
-        notifyFollowUpDue: updated?.notifyFollowUpDue ?? true,
-        targetDailyApplications: updated?.targetDailyApplications || DEFAULT_INITIAL_TARGET,
+        defaultFollowUpDays:
+          typeof updated?.defaultFollowUpDays === "number"
+            ? updated.defaultFollowUpDays
+            : DEFAULT_FOLLOW_UP_DAYS,
+        notifyEmailDetected:
+          typeof updated?.notifyEmailDetected === "boolean"
+            ? updated.notifyEmailDetected
+            : true,
+        notifyFollowUpDue:
+          typeof updated?.notifyFollowUpDue === "boolean"
+            ? updated.notifyFollowUpDue
+            : true,
+        targetDailyApplications:
+          typeof updated?.targetDailyApplications === "number"
+            ? updated.targetDailyApplications
+            : DEFAULT_INITIAL_TARGET,
       },
     });
   } catch (error: unknown) {
@@ -75,4 +116,3 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

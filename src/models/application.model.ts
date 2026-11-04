@@ -88,5 +88,9 @@ const ApplicationSchema = new Schema<IApplication>(
   }
 );
 
+if (process.env.NODE_ENV !== "production") {
+  delete (mongoose.models as Record<string, unknown>).Application;
+}
+
 export const Application: Model<IApplication> =
   mongoose.models.Application || mongoose.model<IApplication>("Application", ApplicationSchema);
