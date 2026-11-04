@@ -4,6 +4,13 @@ import { DEFAULT_INITIAL_TARGET } from "@/lib/constants";
 
 const DailyProgressSchema = new Schema<IDailyProgress>(
   {
+    userEmail: {
+      type: String,
+      required: true,
+      index: true,
+      lowercase: true,
+      trim: true,
+    },
     categoryId: {
       type: Schema.Types.ObjectId,
       ref: "Category",
@@ -35,9 +42,8 @@ const DailyProgressSchema = new Schema<IDailyProgress>(
   }
 );
 
-// Ensure only one progress document exists per category per client date
-DailyProgressSchema.index({ categoryId: 1, date: 1 }, { unique: true });
+// Ensure only one progress document exists per user per category per client date
+DailyProgressSchema.index({ userEmail: 1, categoryId: 1, date: 1 }, { unique: true });
 
 export const DailyProgress: Model<IDailyProgress> =
   mongoose.models.DailyProgress || mongoose.model<IDailyProgress>("DailyProgress", DailyProgressSchema);
-

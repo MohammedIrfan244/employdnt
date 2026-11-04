@@ -1,7 +1,9 @@
 import { connectDB } from "@/lib/mongodb";
 import { DailyProgress } from "@/models/daily-progress.model";
+import { Category } from "@/models/category.model";
 import { DEFAULT_GOAL_MILESTONES, DEFAULT_INITIAL_TARGET } from "@/lib/constants";
 import { IDailyProgress } from "@/types/daily-progress";
+import { ICategory } from "@/types/category";
 
 /**
  * Calculates the appropriate milestone target based on the current application count.
@@ -12,10 +14,10 @@ export function calculateNextMilestone(
   initialTarget: number = DEFAULT_INITIAL_TARGET
 ): { currentMilestone: number; isCompleted: boolean } {
   const milestones: readonly number[] = DEFAULT_GOAL_MILESTONES;
-  
+
   // Find the smallest milestone in the sequence that is strictly greater than count
   let target = milestones.find((m) => m > count);
-  
+
   if (!target) {
     // If user exceeds highest predefined milestone (50), scale progressively by 10
     const maxMilestone = milestones[milestones.length - 1];
@@ -38,11 +40,19 @@ export function calculateNextMilestone(
 export async function getCategoryDailyProgress(
   categoryId: string,
   clientDate: string,
+  userEmail: string,
   defaultTarget: number = DEFAULT_INITIAL_TARGET
 ): Promise<IDailyProgress> {
   await connectDB();
 
+  // Auto-migrate legacy progress records without userEmail to the active user
+  await DailyProgress.updateMany(
+    { userEmail: { $exists: false } },
+    { $set: { userEmail } }
+  );
+
   const progress = await DailyProgress.findOne({
+    userEmail,
     categoryId,
     date: clientDate,
   }).lean();
@@ -50,6 +60,7 @@ export async function getCategoryDailyProgress(
   if (!progress) {
     const { currentMilestone, isCompleted } = calculateNextMilestone(0, defaultTarget);
     const created = await DailyProgress.create({
+      userEmail,
       categoryId,
       date: clientDate,
       count: 0,
@@ -63,23 +74,22 @@ export async function getCategoryDailyProgress(
 }
 
 /**
- * Increments today's application count for a category and advances milestones progressively.
+ * Increments the daily application count for a category on a client date.
  */
 export async function incrementCategoryDailyProgress(
   categoryId: string,
   clientDate: string,
+  userEmail: string,
   defaultTarget: number = DEFAULT_INITIAL_TARGET
 ): Promise<IDailyProgress> {
   await connectDB();
 
-  // Find or create existing record
-  const existing = await DailyProgress.findOne({ categoryId, date: clientDate });
-
-  const newCount = (existing?.count || 0) + 1;
+  const progress = await getCategoryDailyProgress(categoryId, clientDate, userEmail, defaultTarget);
+  const newCount = progress.count + 1;
   const { currentMilestone, isCompleted } = calculateNextMilestone(newCount, defaultTarget);
 
   const updated = await DailyProgress.findOneAndUpdate(
-    { categoryId, date: clientDate },
+    { userEmail, categoryId, date: clientDate },
     {
       $set: {
         count: newCount,
@@ -87,8 +97,50 @@ export async function incrementCategoryDailyProgress(
         isCompleted,
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { new: true, upsert: true }
   ).lean();
 
   return JSON.parse(JSON.stringify(updated));
+}
+
+/**
+ * Retrieves the full progress overview for all active categories on a given client date.
+ */
+export async function getTodayProgressOverview(
+  clientDate: string,
+  userEmail: string
+): Promise<{
+  categories: Array<{
+    category: ICategory;
+    progress: IDailyProgress;
+  }>;
+  totalToday: number;
+}> {
+  await connectDB();
+
+  const activeCategories = await Category.find({ userEmail, isArchived: false })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  let totalToday = 0;
+  const categoriesProgress = await Promise.all(
+    activeCategories.map(async (category) => {
+      const progress = await getCategoryDailyProgress(
+        category._id.toString(),
+        clientDate,
+        userEmail,
+        category.defaultTarget
+      );
+      totalToday += progress.count;
+      return {
+        category: JSON.parse(JSON.stringify(category)),
+        progress,
+      };
+    })
+  );
+
+  return {
+    categories: categoriesProgress,
+    totalToday,
+  };
 }

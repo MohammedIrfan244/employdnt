@@ -389,8 +389,9 @@ export async function scanUserGmail(
     const existingSet = new Set(existingEmails.map((e) => e.messageId));
     const newMessages = messages.filter((m) => !existingSet.has(m.id));
 
-    // Fetch existing active applications to match against
+    // Fetch existing active applications to match against, scoped to user
     const applications = await Application.find({
+      userEmail,
       status: { $nin: ["Withdrawn"] },
     }).lean();
 
@@ -553,9 +554,13 @@ export async function confirmEmailMatch(
 
     // 2. Apply suggested status transition if confirmed by user (Module 4.5)
     if (options.applySuggestedStatus && detected.suggestedStatus) {
-      await updateApplication(targetAppId, {
-        status: detected.suggestedStatus,
-      });
+      await updateApplication(
+        targetAppId,
+        {
+          status: detected.suggestedStatus,
+        },
+        userEmail
+      );
     }
   }
 

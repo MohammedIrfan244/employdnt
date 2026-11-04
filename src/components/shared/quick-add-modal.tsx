@@ -8,6 +8,7 @@ import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { ICategory } from "@/types/category";
+import { IResume } from "@/types/resume";
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
   const { todayString } = useClientDate();
 
   const [categories, setCategories] = useState<ICategory[]>([]);
+  const [resumes, setResumes] = useState<IResume[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -34,21 +36,33 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
   const [recruiterName, setRecruiterName] = useState("");
   const [recruiterEmail, setRecruiterEmail] = useState("");
   const [salary, setSalary] = useState("");
+  const [resumeUsed, setResumeUsed] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
 
     let mounted = true;
-    async function loadCategories() {
+    async function loadData() {
       setLoadingCategories(true);
       try {
-        const res = await fetch("/api/categories");
-        const json = await res.json();
-        if (mounted && json.success && Array.isArray(json.data)) {
-          setCategories(json.data);
-          if (json.data.length > 0 && !categoryId) {
-            setCategoryId(json.data[0]._id.toString());
+        const [catRes, resRes] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/resumes"),
+        ]);
+        const [catData, resData] = await Promise.all([catRes.json(), resRes.json()]);
+
+        if (mounted && catData.success && Array.isArray(catData.data)) {
+          setCategories(catData.data);
+          if (catData.data.length > 0 && !categoryId) {
+            setCategoryId(catData.data[0]._id.toString());
+          }
+        }
+        if (mounted && resData.success && Array.isArray(resData.data)) {
+          setResumes(resData.data);
+          const defaultResume = resData.data.find((r: IResume) => r.isDefault);
+          if (defaultResume) {
+            setResumeUsed(defaultResume.name);
           }
         }
       } catch {
@@ -57,7 +71,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
         if (mounted) setLoadingCategories(false);
       }
     }
-    loadCategories();
+    loadData();
 
     return () => {
       mounted = false;
@@ -93,6 +107,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
         recruiterName: recruiterName.trim() || undefined,
         recruiterEmail: recruiterEmail.trim() || undefined,
         salary: salary.trim() || undefined,
+        resumeUsed: resumeUsed.trim() || undefined,
         notes: notes.trim() || undefined,
         clientDate: todayString,
       };
@@ -116,6 +131,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
       setRecruiterName("");
       setRecruiterEmail("");
       setSalary("");
+      setResumeUsed("");
       setNotes("");
       setShowOptional(false);
 
@@ -133,6 +149,14 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
     value: c._id?.toString() || "",
     label: c.name,
   }));
+
+  const resumeOptions = [
+    { value: "", label: "None specified" },
+    ...resumes.map((r) => ({
+      value: r.name,
+      label: `${r.name}${r.isDefault ? " (Default)" : ""}`,
+    })),
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs">
@@ -202,7 +226,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
               ) : (
                 <>
                   <ChevronRight className="w-3.5 h-3.5" />
-                  <span>Add extra details (salary, link, notes)</span>
+                  <span>Add extra details (resume, salary, link, notes)</span>
                 </>
               )}
             </button>
@@ -216,6 +240,15 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
                   onChange={(e) => setJobUrl(e.target.value)}
                   placeholder="https://..."
                 />
+
+                {resumes.length > 0 && (
+                  <Select
+                    label="Resume Version Used"
+                    value={resumeUsed}
+                    onChange={(val) => setResumeUsed(val)}
+                    options={resumeOptions}
+                  />
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <Input

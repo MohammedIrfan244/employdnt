@@ -17,14 +17,17 @@ export interface IFollowUpOverview {
 
 /**
  * Retrieves follow-up overview categorized into due/overdue and upcoming,
- * calculated strictly relative to client date.
+ * calculated strictly relative to client date, scoped to the user.
  */
-export async function getFollowUpOverview(clientDateStr?: string): Promise<IFollowUpOverview> {
+export async function getFollowUpOverview(
+  clientDateStr: string | undefined,
+  userEmail: string
+): Promise<IFollowUpOverview> {
   await connectDB();
 
   // Auto-heal any legacy out-of-sync records: completed follow-ups still marked "Follow-up Needed"
   await Application.updateMany(
-    { followUpCompleted: true, status: "Follow-up Needed" },
+    { userEmail, followUpCompleted: true, status: "Follow-up Needed" },
     { $set: { status: "Applied" } }
   );
 
@@ -43,6 +46,7 @@ export async function getFollowUpOverview(clientDateStr?: string): Promise<IFoll
 
   // 1. Due / Overdue follow-ups
   const dueApps = await Application.find({
+    userEmail,
     status: { $nin: nonFollowUpStatuses },
     followUpCompleted: { $ne: true },
     followUpDismissed: { $ne: true },
@@ -58,22 +62,24 @@ export async function getFollowUpOverview(clientDateStr?: string): Promise<IFoll
     .lean();
 
   // 2. Upcoming follow-ups (next 14 days after client today)
-  const futureLimit = addDays(clientReferenceDate, 14);
+  const fourteenDaysOut = addDays(clientReferenceDate, 14);
   const upcomingApps = await Application.find({
-    status: { $nin: nonFollowUpStatuses },
+    userEmail,
+    status: { $nin: [...nonFollowUpStatuses, "Follow-up Needed"] },
     followUpCompleted: { $ne: true },
     followUpDismissed: { $ne: true },
     followUpDate: {
       $gt: clientReferenceDate,
-      $lte: futureLimit,
+      $lte: fourteenDaysOut,
     },
   })
     .populate("categoryId", "name defaultTarget")
     .sort({ followUpDate: 1 })
     .lean();
 
-  // 3. Total completed follow-ups count
+  // 3. Stats calculation
   const completedCount = await Application.countDocuments({
+    userEmail,
     followUpCompleted: true,
   });
 
@@ -89,110 +95,90 @@ export async function getFollowUpOverview(clientDateStr?: string): Promise<IFoll
 }
 
 /**
- * Marks follow-up as completed and logs to application timeline.
+ * Executes a follow-up action: complete, reschedule, or dismiss.
  */
-export async function completeFollowUp(id: string): Promise<IApplication | null> {
-  await connectDB();
-
-  const application = await Application.findById(id);
-  if (!application) return null;
-
-  application.followUpCompleted = true;
-
-  // Revert temporary "Follow-up Needed" status back to "Applied"
-  if (application.status === "Follow-up Needed") {
-    application.status = "Applied";
-    await logTimelineEvent(
-      id,
-      EVENT_TYPES.STATUS_CHANGED,
-      'Status updated from "Follow-up Needed" to "Applied"'
-    );
-  }
-
-  await application.save();
-
-  await logTimelineEvent(id, EVENT_TYPES.FOLLOW_UP_COMPLETED, "Follow-up marked as completed");
-
-  return JSON.parse(JSON.stringify(application));
-}
-
-/**
- * Postpones follow-up date by N days (in client time) and logs to timeline.
- */
-export async function postponeFollowUp(
-  id: string,
-  days: number = 3,
-  clientDateStr?: string
+export async function executeFollowUpAction(
+  applicationId: string,
+  userEmail: string,
+  action: "complete" | "reschedule" | "dismiss",
+  options: {
+    rescheduleDate?: Date | string;
+    note?: string;
+    clientDate?: string;
+  } = {}
 ): Promise<IApplication | null> {
   await connectDB();
 
-  const application = await Application.findById(id);
-  if (!application) return null;
+  const app = await Application.findOne({ _id: applicationId, userEmail });
+  if (!app) return null;
 
-  // Base date is either client today or existing followUpDate, whichever is later
-  let baseDate = new Date();
-  if (clientDateStr && /^\d{4}-\d{2}-\d{2}$/.test(clientDateStr)) {
-    const [y, m, d] = clientDateStr.split("-").map(Number);
-    baseDate = new Date(y, m - 1, d);
+  switch (action) {
+    case "complete": {
+      app.followUpCompleted = true;
+      app.followUpDismissed = false;
+      if (app.status === "Follow-up Needed") {
+        app.status = "Applied";
+      }
+      await app.save();
+
+      await logTimelineEvent(
+        applicationId,
+        EVENT_TYPES.FOLLOW_UP_COMPLETED,
+        options.note || "Follow-up marked as completed",
+        { completedAt: new Date(), clientDate: options.clientDate }
+      );
+      break;
+    }
+
+    case "reschedule": {
+      if (!options.rescheduleDate) {
+        throw new Error("rescheduleDate is required for reschedule action");
+      }
+      const newDate = new Date(options.rescheduleDate);
+      app.followUpDate = newDate;
+      app.followUpCompleted = false;
+      app.followUpDismissed = false;
+      await app.save();
+
+      await logTimelineEvent(
+        applicationId,
+        EVENT_TYPES.FOLLOW_UP_SCHEDULED,
+        options.note || `Follow-up rescheduled to ${newDate.toLocaleDateString()}`,
+        { newDate }
+      );
+      break;
+    }
+
+    case "dismiss": {
+      app.followUpDismissed = true;
+      await app.save();
+
+      await logTimelineEvent(
+        applicationId,
+        EVENT_TYPES.FOLLOW_UP_DISMISSED,
+        options.note || "Follow-up reminder dismissed by user"
+      );
+      break;
+    }
   }
 
-  const newFollowUpDate = addDays(baseDate, days);
-
-  application.followUpDate = newFollowUpDate;
-  application.followUpCompleted = false;
-  application.followUpDismissed = false;
-
-  // Revert "Follow-up Needed" back to "Applied" as follow-up is deferred to the future date
-  if (application.status === "Follow-up Needed") {
-    application.status = "Applied";
-    await logTimelineEvent(
-      id,
-      EVENT_TYPES.STATUS_CHANGED,
-      'Status updated from "Follow-up Needed" to "Applied"'
-    );
-  }
-
-  await application.save();
-
-  const formattedDate = newFollowUpDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  await logTimelineEvent(
-    id,
-    EVENT_TYPES.FOLLOW_UP_POSTPONED,
-    `Follow-up postponed by ${days} day${days > 1 ? "s" : ""} (scheduled for ${formattedDate})`
-  );
-
-  return JSON.parse(JSON.stringify(application));
+  return JSON.parse(JSON.stringify(app));
 }
 
-/**
- * Dismisses follow-up reminder for an application without affecting status.
- */
-export async function dismissFollowUp(id: string): Promise<IApplication | null> {
-  await connectDB();
+export async function completeFollowUp(applicationId: string, userEmail: string, note?: string) {
+  return executeFollowUpAction(applicationId, userEmail, "complete", { note });
+}
 
-  const application = await Application.findById(id);
-  if (!application) return null;
+export async function postponeFollowUp(applicationId: string, userEmail: string, days: number = 3, clientDate?: string) {
+  const reference = clientDate ? new Date(clientDate) : new Date();
+  const rescheduleDate = addDays(reference, days);
+  return executeFollowUpAction(applicationId, userEmail, "reschedule", {
+    rescheduleDate,
+    clientDate,
+    note: `Follow-up postponed by ${days} days`,
+  });
+}
 
-  application.followUpDismissed = true;
-
-  // Revert "Follow-up Needed" back to "Applied" as reminder is dismissed
-  if (application.status === "Follow-up Needed") {
-    application.status = "Applied";
-    await logTimelineEvent(
-      id,
-      EVENT_TYPES.STATUS_CHANGED,
-      'Status updated from "Follow-up Needed" to "Applied"'
-    );
-  }
-
-  await application.save();
-
-  await logTimelineEvent(id, EVENT_TYPES.FOLLOW_UP_DISMISSED, "Follow-up reminder dismissed");
-
-  return JSON.parse(JSON.stringify(application));
+export async function dismissFollowUp(applicationId: string, userEmail: string) {
+  return executeFollowUpAction(applicationId, userEmail, "dismiss");
 }

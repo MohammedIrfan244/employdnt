@@ -3,6 +3,7 @@ import { ApplicationStatus } from "@/lib/constants";
 
 export interface IApplication {
   _id?: Types.ObjectId | string;
+  userEmail: string;
   company: string;
   role: string;
   categoryId: Types.ObjectId | string;

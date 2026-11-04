@@ -7,7 +7,7 @@ import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Badge from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
-import { Clock, Calendar, Check, CheckCircle2, Mail, X, ArrowUpRight } from "lucide-react";
+import { Calendar, Check, CheckCircle2, Mail, ArrowUpRight } from "lucide-react";
 import { IApplication } from "@/types/application";
 import { IFollowUpOverview } from "@/services/follow-up.service";
 

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 
 export interface IDailyProgress {
   _id?: Types.ObjectId | string;
+  userEmail: string;
   categoryId: Types.ObjectId | string;
   date: string; // Stored in YYYY-MM-DD relative to client local date
   count: number;

@@ -16,6 +16,8 @@ const navItems = [
   { label: "Today", href: "/today", match: ["/", "/today"] },
   { label: "Applications", href: "/applications", match: ["/applications"] },
   { label: "Follow-up", href: "/follow-up", match: ["/follow-up"] },
+  { label: "Resources", href: "/resources", match: ["/resources"] },
+  { label: "Profile", href: "/profile", match: ["/profile"] },
   { label: "Settings", href: "/settings", match: ["/settings"] },
 ];
 
@@ -60,14 +62,14 @@ function MobileNavLinks() {
   };
 
   return (
-    <nav className="md:hidden flex items-center justify-around border-t border-[var(--border)] px-3 py-2 bg-[var(--surface)]">
+    <nav className="md:hidden flex items-center justify-around border-t border-[var(--border)] px-2 py-2 bg-[var(--surface)] overflow-x-auto">
       {navItems.map((item) => {
         const active = isActive(item.match);
         return (
           <NextLink
             key={item.href}
             href={item.href}
-            className={`px-3 py-1 text-xs font-medium rounded-md ${
+            className={`px-2.5 py-1 text-xs font-medium rounded-md whitespace-nowrap ${
               active
                 ? "text-[var(--accent)] bg-[var(--accent-light)] font-semibold"
                 : "text-[var(--muted)] hover:text-[var(--foreground)]"

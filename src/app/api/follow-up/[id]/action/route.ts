@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import {
   completeFollowUp,
   postponeFollowUp,
@@ -11,6 +12,12 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth();
+    const userEmail = session?.user?.email;
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { action, days = 3, clientDate } = body;
@@ -19,13 +26,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     switch (action) {
       case "complete":
-        updated = await completeFollowUp(id);
+        updated = await completeFollowUp(id, userEmail);
         break;
       case "postpone":
-        updated = await postponeFollowUp(id, Number(days) || 3, clientDate);
+        updated = await postponeFollowUp(id, userEmail, Number(days) || 3, clientDate);
         break;
       case "dismiss":
-        updated = await dismissFollowUp(id);
+        updated = await dismissFollowUp(id, userEmail);
         break;
       default:
         return NextResponse.json(
@@ -47,4 +54,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

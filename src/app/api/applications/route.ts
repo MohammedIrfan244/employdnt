@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import {
   getApplications,
   createApplication,
@@ -7,11 +8,17 @@ import {
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    const userEmail = session?.user?.email;
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
 
     if (searchParams.get("recent") === "true") {
       const limit = Number(searchParams.get("limit")) || 5;
-      const recent = await getRecentApplications(limit);
+      const recent = await getRecentApplications(userEmail, limit);
       return NextResponse.json({ success: true, data: recent });
     }
 
@@ -21,7 +28,7 @@ export async function GET(req: NextRequest) {
     const limit = Number(searchParams.get("limit")) || 50;
     const skip = Number(searchParams.get("skip")) || 0;
 
-    const result = await getApplications({
+    const result = await getApplications(userEmail, {
       categoryId,
       status,
       search,
@@ -38,6 +45,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    const userEmail = session?.user?.email;
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
 
     if (!body.company?.trim()) {
@@ -50,20 +63,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Category is required" }, { status: 400 });
     }
 
-    const application = await createApplication({
-      company: body.company,
-      role: body.role,
-      categoryId: body.categoryId,
-      jobUrl: body.jobUrl,
-      recruiterName: body.recruiterName,
-      recruiterEmail: body.recruiterEmail,
-      contactDetails: body.contactDetails,
-      salary: body.salary,
-      jobDescription: body.jobDescription,
-      notes: body.notes,
-      resumeUsed: body.resumeUsed,
-      clientDate: body.clientDate, // Local client YYYY-MM-DD
-    });
+    const application = await createApplication(
+      {
+        company: body.company,
+        role: body.role,
+        categoryId: body.categoryId,
+        jobUrl: body.jobUrl,
+        recruiterName: body.recruiterName,
+        recruiterEmail: body.recruiterEmail,
+        contactDetails: body.contactDetails,
+        salary: body.salary,
+        jobDescription: body.jobDescription,
+        notes: body.notes,
+        resumeUsed: body.resumeUsed,
+        clientDate: body.clientDate, // Local client YYYY-MM-DD
+      },
+      userEmail
+    );
 
     return NextResponse.json({ success: true, data: application }, { status: 201 });
   } catch (error: unknown) {
