@@ -4,6 +4,13 @@ import { APPLICATION_STATUSES } from "@/lib/constants";
 
 const ApplicationSchema = new Schema<IApplication>(
   {
+    userEmail: {
+      type: String,
+      required: [true, "User email is required"],
+      index: true,
+      lowercase: true,
+      trim: true,
+    },
     company: {
       type: String,
       required: [true, "Company name is required"],
@@ -81,6 +88,9 @@ const ApplicationSchema = new Schema<IApplication>(
   }
 );
 
+if (process.env.NODE_ENV !== "production") {
+  delete (mongoose.models as Record<string, unknown>).Application;
+}
+
 export const Application: Model<IApplication> =
   mongoose.models.Application || mongoose.model<IApplication>("Application", ApplicationSchema);
-

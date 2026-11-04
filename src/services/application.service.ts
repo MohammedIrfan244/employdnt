@@ -34,10 +34,13 @@ export interface ApplicationFilterDTO {
 /**
  * Creates an application with Module 2.2 Automatic Initialization.
  */
-export async function createApplication(dto: CreateApplicationDTO): Promise<IApplication> {
+export async function createApplication(
+  dto: CreateApplicationDTO,
+  userEmail: string
+): Promise<IApplication> {
   await connectDB();
 
-  const category = await Category.findById(dto.categoryId);
+  const category = await Category.findOne({ _id: dto.categoryId, userEmail });
   if (!category) {
     throw new Error("Category not found");
   }
@@ -48,6 +51,7 @@ export async function createApplication(dto: CreateApplicationDTO): Promise<IApp
 
   // 1. Create the application record
   const newApp = await Application.create({
+    userEmail,
     company: dto.company.trim(),
     role: dto.role.trim(),
     categoryId: dto.categoryId,
@@ -75,6 +79,7 @@ export async function createApplication(dto: CreateApplicationDTO): Promise<IApp
   await incrementCategoryDailyProgress(
     dto.categoryId,
     clientDateString,
+    userEmail,
     category.defaultTarget
   );
 
@@ -96,16 +101,25 @@ export async function createApplication(dto: CreateApplicationDTO): Promise<IApp
 /**
  * Retrieves applications with optional filtering and pagination.
  */
-export async function getApplications(filters: ApplicationFilterDTO = {}) {
+export async function getApplications(
+  userEmail: string,
+  filters: ApplicationFilterDTO = {}
+) {
   await connectDB();
+
+  // Auto-migrate legacy records without userEmail to the active user
+  await Application.updateMany(
+    { userEmail: { $exists: false } },
+    { $set: { userEmail } }
+  );
 
   // Auto-heal any legacy records where followUpCompleted: true but status remains "Follow-up Needed"
   await Application.updateMany(
-    { followUpCompleted: true, status: "Follow-up Needed" },
+    { userEmail, followUpCompleted: true, status: "Follow-up Needed" },
     { $set: { status: "Applied" } }
   );
 
-  const query: Record<string, unknown> = {};
+  const query: Record<string, unknown> = { userEmail };
 
   if (filters.categoryId) {
     query.categoryId = filters.categoryId;
@@ -142,11 +156,33 @@ export async function getApplications(filters: ApplicationFilterDTO = {}) {
 }
 
 /**
+ * Retrieves the most recent applications for the user.
+ */
+export async function getRecentApplications(
+  userEmail: string,
+  limit: number = 5
+): Promise<IApplication[]> {
+  await connectDB();
+  const recent = await Application.find({ userEmail })
+    .populate("categoryId", "name")
+    .sort({ appliedDate: -1 })
+    .limit(limit)
+    .lean();
+  return JSON.parse(JSON.stringify(recent));
+}
+
+/**
  * Retrieves a single application by ID with category information.
  */
-export async function getApplicationById(id: string): Promise<IApplication | null> {
+export async function getApplicationById(
+  id: string,
+  userEmail: string
+): Promise<IApplication | null> {
   await connectDB();
-  const app = await Application.findById(id).populate("categoryId", "name defaultTarget");
+  const app = await Application.findOne({ _id: id, userEmail }).populate(
+    "categoryId",
+    "name defaultTarget"
+  );
   if (!app) return null;
 
   // Auto-heal legacy out-of-sync state: followUpCompleted: true while status: "Follow-up Needed"
@@ -163,11 +199,13 @@ export async function getApplicationById(id: string): Promise<IApplication | nul
  */
 export async function updateApplication(
   id: string,
-  updates: Partial<IApplication>
+  updates: Partial<IApplication>,
+  userEmail?: string
 ): Promise<IApplication | null> {
   await connectDB();
 
-  const existing = await Application.findById(id);
+  const query = userEmail ? { _id: id, userEmail } : { _id: id };
+  const existing = await Application.findOne(query);
   if (!existing) return null;
 
   const oldStatus = existing.status;
@@ -190,8 +228,8 @@ export async function updateApplication(
     }
   }
 
-  const updated = await Application.findByIdAndUpdate(
-    id,
+  const updated = await Application.findOneAndUpdate(
+    query,
     { $set: updates },
     { new: true, runValidators: true }
   ).lean();
@@ -200,7 +238,8 @@ export async function updateApplication(
     await logTimelineEvent(
       id,
       EVENT_TYPES.STATUS_CHANGED,
-      `Status updated from "${oldStatus}" to "${newStatus}"`
+      `Status updated from ${oldStatus} to ${newStatus}`,
+      { from: oldStatus, to: newStatus }
     );
   }
 
@@ -208,49 +247,13 @@ export async function updateApplication(
 }
 
 /**
- * Deletes an application (does not affect lifetime totals or categories).
+ * Deletes an application.
  */
-export async function deleteApplication(id: string): Promise<boolean> {
+export async function deleteApplication(
+  id: string,
+  userEmail: string
+): Promise<boolean> {
   await connectDB();
-  const result = await Application.findByIdAndDelete(id);
-  return !!result;
+  const res = await Application.deleteOne({ _id: id, userEmail });
+  return res.deletedCount > 0;
 }
-
-/**
- * Gets recent applications for the dashboard feed (Module 1.5).
- */
-export async function getRecentApplications(limit: number = 5): Promise<IApplication[]> {
-  await connectDB();
-  const recent = await Application.find()
-    .populate("categoryId", "name")
-    .sort({ appliedDate: -1 })
-    .limit(limit)
-    .lean();
-  return JSON.parse(JSON.stringify(recent));
-}
-
-/**
- * Gets applications requiring attention (follow-up due or status is Follow-up Needed) (Module 1.4).
- */
-export async function getNeedsAttentionApplications(): Promise<IApplication[]> {
-  await connectDB();
-  const now = new Date();
-
-  const applications = await Application.find({
-    $or: [
-      { status: "Follow-up Needed" },
-      {
-        followUpDate: { $lte: now },
-        followUpCompleted: false,
-        followUpDismissed: false,
-        status: "Applied",
-      },
-    ],
-  })
-    .populate("categoryId", "name")
-    .sort({ followUpDate: 1 })
-    .lean();
-
-  return JSON.parse(JSON.stringify(applications));
-}
-

@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getActiveCategories } from "@/services/category.service";
 import { getCategoryDailyProgress } from "@/services/progress.service";
 import { getClientDateString } from "@/lib/date-utils";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    const userEmail = session?.user?.email;
+    if (!userEmail) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const clientDate = searchParams.get("clientDate") || getClientDateString(new Date());
 
-    const categories = await getActiveCategories();
+    const categories = await getActiveCategories(userEmail);
 
     const progressList = await Promise.all(
       categories.map(async (cat) => {
@@ -16,6 +23,7 @@ export async function GET(req: NextRequest) {
         const progress = await getCategoryDailyProgress(
           catId,
           clientDate,
+          userEmail,
           cat.defaultTarget
         );
 
@@ -38,4 +46,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-
