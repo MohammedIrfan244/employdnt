@@ -7,7 +7,13 @@ export interface IUser {
   image?: string;
   googleId?: string;
   defaultFollowUpDays?: number;
+  // Gmail integration fields
+  gmailConnected?: boolean;
+  gmailEmail?: string;
+  gmailAccessToken?: string;
+  gmailRefreshToken?: string;
+  gmailTokenExpiresAt?: number;
+  gmailLastSyncedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
-

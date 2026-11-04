@@ -87,6 +87,8 @@ export default function Today() {
     }
   };
 
+
+
   const totalLifetime = categoriesProgress.reduce(
     (acc, curr) => acc + (curr.category.lifetimeCount || 0),
     0
