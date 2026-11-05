@@ -27,15 +27,75 @@ export type LeadSource =
   | "Twitter/X"
   | "Other";
 
+// 1. Statement of Work (SOW) Data Schema
+export interface ISowDocumentData {
+  developerName: string;
+  developerEmail?: string;
+  clientName: string;
+  companyName: string;
+  projectTitle: string;
+  effectiveDate: string; // YYYY-MM-DD
+  projectOverview: string;
+  coreDeliverables: string[];
+  outOfScope: string[];
+  estimatedBudget: number;
+  currency: string;
+  paymentTerms: string;
+  timelineWeeks?: number;
+  revisionPolicy?: string;
+  generatedAt?: string;
+}
+
+// 2. Contract Agreement Data Schema
+export interface IContractDocumentData {
+  developerName: string;
+  developerEmail?: string;
+  clientName: string;
+  companyName: string;
+  projectTitle: string;
+  effectiveDate: string; // YYYY-MM-DD
+  servicesDescription: string;
+  agreedAmount: number;
+  currency: string;
+  paymentSchedule: string;
+  ipOwnershipClause?: string;
+  confidentialityTerms?: string;
+  warrantyDays?: number;
+  governingLaw?: string;
+  generatedAt?: string;
+}
+
+// 3. Project Handover Document Data Schema
+export interface IHandoverDocumentData {
+  developerName: string;
+  developerEmail?: string;
+  clientName: string;
+  companyName: string;
+  projectTitle: string;
+  handoverDate: string; // YYYY-MM-DD
+  productionUrl: string;
+  stagingUrl?: string;
+  repositoryUrl: string;
+  hostingProvider?: string;
+  credentialsChecklist: Array<{ item: string; transferred: boolean }>;
+  supportPeriodDays?: number;
+  supportEndDate?: string;
+  maintenanceNotes?: string;
+  generatedAt?: string;
+}
+
 export interface IStageScoping {
   requirementsSummary?: string;
   scopeDocUrl?: string;
+  scopeDocFileName?: string;
+  sowData?: ISowDocumentData;
   budgetEstimate?: number;
   currency?: string;
 }
 
 export interface IStageContract {
   contractDocUrl?: string;
+  contractData?: IContractDocumentData;
   agreedAmount?: number;
   currency?: string;
   functionalRequirements?: string;
@@ -58,6 +118,7 @@ export interface IStageLaunch {
   productionUrl?: string;
   deploymentDate?: string;
   handoverNotes?: string;
+  handoverData?: IHandoverDocumentData;
 }
 
 export interface IStagePostLaunch {

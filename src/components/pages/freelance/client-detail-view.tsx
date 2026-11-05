@@ -14,7 +14,14 @@ import {
   IFreelanceClient,
   FreelanceStage,
   FREELANCE_STAGES,
+  ISowDocumentData,
+  IContractDocumentData,
+  IHandoverDocumentData,
 } from "@/types/freelance-client";
+import SowGeneratorModal from "@/components/freelance/documents/sow-generator-modal";
+import ContractGeneratorModal from "@/components/freelance/documents/contract-generator-modal";
+import HandoverGeneratorModal from "@/components/freelance/documents/handover-generator-modal";
+import DocumentViewerModal from "@/components/freelance/documents/document-viewer-modal";
 import {
   ArrowLeft,
   Building2,
@@ -33,6 +40,11 @@ import {
   Rocket,
   ShieldCheck,
   Clock,
+  Upload,
+  FileUp,
+  FileCheck,
+  Eye,
+  Download,
 } from "lucide-react";
 
 interface ClientDetailViewProps {
@@ -64,10 +76,14 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
   // Scoping fields
   const [requirementsSummary, setRequirementsSummary] = useState("");
   const [scopeDocUrl, setScopeDocUrl] = useState("");
+  const [scopeDocFileName, setScopeDocFileName] = useState("");
+  const [sowData, setSowData] = useState<ISowDocumentData | undefined>();
   const [budgetEstimate, setBudgetEstimate] = useState<number | undefined>();
+  const [uploadingSow, setUploadingSow] = useState(false);
 
   // Contract fields
   const [contractDocUrl, setContractDocUrl] = useState("");
+  const [contractData, setContractData] = useState<IContractDocumentData | undefined>();
   const [agreedAmount, setAgreedAmount] = useState<number | undefined>();
   const [functionalRequirements, setFunctionalRequirements] = useState("");
   const [signedDate, setSignedDate] = useState("");
@@ -86,11 +102,28 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
   const [productionUrl, setProductionUrl] = useState("");
   const [deploymentDate, setDeploymentDate] = useState("");
   const [handoverNotes, setHandoverNotes] = useState("");
+  const [handoverData, setHandoverData] = useState<IHandoverDocumentData | undefined>();
 
   // Post-Launch fields
   const [supportPeriodMonths, setSupportPeriodMonths] = useState<number | undefined>();
   const [supportEndDate, setSupportEndDate] = useState("");
   const [maintenanceNotes, setMaintenanceNotes] = useState("");
+
+  // Document Modals
+  const [isSowGenOpen, setIsSowGenOpen] = useState(false);
+  const [isContractGenOpen, setIsContractGenOpen] = useState(false);
+  const [isHandoverGenOpen, setIsHandoverGenOpen] = useState(false);
+  const [viewerDoc, setViewerDoc] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: "sow" | "contract" | "handover";
+    data: ISowDocumentData | IContractDocumentData | IHandoverDocumentData | null;
+  }>({
+    isOpen: false,
+    title: "",
+    type: "sow",
+    data: null,
+  });
 
   const fetchClient = useCallback(async () => {
     try {
@@ -112,10 +145,13 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         // Scoping
         setRequirementsSummary(c.scoping?.requirementsSummary || "");
         setScopeDocUrl(c.scoping?.scopeDocUrl || "");
+        setScopeDocFileName(c.scoping?.scopeDocFileName || "");
+        setSowData(c.scoping?.sowData);
         setBudgetEstimate(c.scoping?.budgetEstimate);
 
         // Contract
         setContractDocUrl(c.contract?.contractDocUrl || "");
+        setContractData(c.contract?.contractData);
         setAgreedAmount(c.contract?.agreedAmount);
         setFunctionalRequirements(c.contract?.functionalRequirements || "");
         setSignedDate(c.contract?.signedDate || "");
@@ -134,6 +170,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         setProductionUrl(c.launch?.productionUrl || "");
         setDeploymentDate(c.launch?.deploymentDate || "");
         setHandoverNotes(c.launch?.handoverNotes || "");
+        setHandoverData(c.launch?.handoverData);
 
         // Post-Launch
         setSupportPeriodMonths(c.postLaunch?.supportPeriodMonths);
@@ -156,6 +193,139 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
     setCurrentStage(newStage);
   };
 
+  const handleSowFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSow(true);
+    setSaveNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (json.success && json.url) {
+        setScopeDocUrl(json.url);
+        setScopeDocFileName(json.fileName || file.name);
+        setSaveNotice("SOW document uploaded successfully");
+      } else {
+        setSaveNotice(json.error || "Failed to upload document");
+      }
+    } catch {
+      setSaveNotice("Network error during document upload");
+    } finally {
+      setUploadingSow(false);
+      e.target.value = "";
+      setTimeout(() => setSaveNotice(null), 3500);
+    }
+  };
+
+  const handleSaveSow = async (data: ISowDocumentData) => {
+    setSowData(data);
+    if (data.estimatedBudget) {
+      setBudgetEstimate(data.estimatedBudget);
+    }
+    try {
+      const res = await fetch(`/api/freelance/clients/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scoping: {
+            requirementsSummary,
+            scopeDocUrl,
+            scopeDocFileName,
+            sowData: data,
+            budgetEstimate: data.estimatedBudget,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setClient(json.data);
+        setSaveNotice("SOW generated and saved to client record");
+      }
+    } catch {
+      setSaveNotice("Error saving SOW data");
+    } finally {
+      setTimeout(() => setSaveNotice(null), 3500);
+    }
+  };
+
+  const handleSaveContract = async (data: IContractDocumentData) => {
+    setContractData(data);
+    if (data.agreedAmount) {
+      setAgreedAmount(data.agreedAmount);
+    }
+    if (data.effectiveDate) {
+      setSignedDate(data.effectiveDate);
+    }
+    try {
+      const res = await fetch(`/api/freelance/clients/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contract: {
+            contractDocUrl,
+            contractData: data,
+            agreedAmount: data.agreedAmount,
+            functionalRequirements,
+            signedDate: data.effectiveDate,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setClient(json.data);
+        setSaveNotice("Contract agreement generated & saved to client record");
+      }
+    } catch {
+      setSaveNotice("Error saving contract data");
+    } finally {
+      setTimeout(() => setSaveNotice(null), 3500);
+    }
+  };
+
+  const handleSaveHandover = async (data: IHandoverDocumentData) => {
+    setHandoverData(data);
+    if (data.productionUrl) {
+      setProductionUrl(data.productionUrl);
+    }
+    if (data.handoverDate) {
+      setDeploymentDate(data.handoverDate);
+    }
+    if (data.maintenanceNotes) {
+      setHandoverNotes(data.maintenanceNotes);
+    }
+    try {
+      const res = await fetch(`/api/freelance/clients/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          launch: {
+            productionUrl: data.productionUrl || productionUrl,
+            deploymentDate: data.handoverDate || deploymentDate,
+            handoverNotes: data.maintenanceNotes || handoverNotes,
+            handoverData: data,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setClient(json.data);
+        setSaveNotice("Handover document generated & saved to client record");
+      }
+    } catch {
+      setSaveNotice("Error saving handover data");
+    } finally {
+      setTimeout(() => setSaveNotice(null), 3500);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -174,10 +344,13 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
       scoping: {
         requirementsSummary,
         scopeDocUrl,
+        scopeDocFileName,
+        sowData,
         budgetEstimate: budgetEstimate ? Number(budgetEstimate) : undefined,
       },
       contract: {
         contractDocUrl,
+        contractData,
         agreedAmount: agreedAmount ? Number(agreedAmount) : undefined,
         functionalRequirements,
         signedDate,
@@ -196,6 +369,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         productionUrl,
         deploymentDate,
         handoverNotes,
+        handoverData,
       },
       postLaunch: {
         supportPeriodMonths: supportPeriodMonths ? Number(supportPeriodMonths) : undefined,
@@ -483,7 +657,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-amber-400" />
                     <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                      2. Scoping Details
+                      2. Scoping Details &amp; SOW
                     </h3>
                   </div>
                   {currentStage === "Scoping" && (
@@ -505,31 +679,155 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-[var(--foreground)]">
-                        Scope Document / SOW Link
-                      </label>
-                      <Input
-                        placeholder="https://docs.google.com/document/..."
-                        value={scopeDocUrl}
-                        onChange={(e) => setScopeDocUrl(e.target.value)}
-                        className="text-xs"
-                      />
+                  <div className="space-y-1">
+                    <label className="font-medium text-[var(--foreground)]">
+                      Estimated Budget (₹ INR)
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 50000"
+                      value={budgetEstimate ?? ""}
+                      onChange={(e) =>
+                        setBudgetEstimate(e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      className="text-xs"
+                    />
+                  </div>
+
+                  {/* SOW Dual-Option Section (Manual Upload or Form Generator) */}
+                  <div className="pt-2 border-t border-[var(--border)] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-amber-400" />
+                        Scope Document / SOW
+                      </span>
+                      <span className="text-[10px] text-[var(--muted)]">
+                        Manual PDF upload or form-based generator
+                      </span>
                     </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-[var(--foreground)]">
-                        Estimated Budget ($ USD)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="e.g. 3500"
-                        value={budgetEstimate ?? ""}
-                        onChange={(e) =>
-                          setBudgetEstimate(e.target.value ? Number(e.target.value) : undefined)
-                        }
-                        className="text-xs"
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Option A: Manual PDF Upload */}
+                      <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                              <FileUp className="w-3.5 h-3.5 text-amber-400" />
+                              Manual PDF Document
+                            </span>
+                            {scopeDocUrl && (
+                              <Badge variant="interview" className="text-[10px]">Attached</Badge>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-[var(--muted)]">
+                            Upload your custom SOW proposal as a PDF file.
+                          </p>
+                        </div>
+
+                        {scopeDocUrl ? (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex items-center justify-between text-xs p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                              <span className="truncate max-w-[150px] font-medium text-amber-300 text-[11px]">
+                                {scopeDocFileName || "SOW-Document.pdf"}
+                              </span>
+                              <a
+                                href={scopeDocUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={scopeDocFileName || "SOW-Document.pdf"}
+                                className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+                              >
+                                <Download className="w-3 h-3" /> Download / View
+                              </a>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] px-1">
+                              <label className="text-[var(--muted)] hover:text-white cursor-pointer underline">
+                                Replace file
+                                <input
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  className="hidden"
+                                  onChange={handleSowFileUpload}
+                                  disabled={uploadingSow}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScopeDocUrl("");
+                                  setScopeDocFileName("");
+                                }}
+                                className="text-red-400 hover:underline cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border border-dashed border-zinc-700 hover:border-amber-500/50 rounded-lg cursor-pointer bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors">
+                            <Upload className="w-4 h-4 text-amber-400 mb-1" />
+                            <span className="text-xs text-zinc-300 font-medium">
+                              {uploadingSow ? "Uploading PDF..." : "Upload Scope PDF"}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted)]">Select PDF from computer</span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={handleSowFileUpload}
+                              disabled={uploadingSow}
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Option B: Form SOW Generator */}
+                      <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                              Generate SOW Form
+                            </span>
+                            {sowData && (
+                              <Badge variant="offer" className="text-[10px]">Form Ready</Badge>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-[var(--muted)]">
+                            Generate standardized SOW with deliverables, budget &amp; terms.
+                          </p>
+                        </div>
+
+                        <div className="pt-2 flex items-center gap-2">
+                          {sowData && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                setViewerDoc({
+                                  isOpen: true,
+                                  title: `SOW - ${companyName || contactName}`,
+                                  type: "sow",
+                                  data: sowData,
+                                })
+                              }
+                              className="text-xs flex items-center gap-1.5 flex-1"
+                            >
+                              <Eye className="w-3 h-3" /> View &amp; Print
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant={sowData ? "ghost" : "secondary"}
+                            size="sm"
+                            onClick={() => setIsSowGenOpen(true)}
+                            className="text-xs flex-1"
+                          >
+                            {sowData ? "Edit Form" : "Open Generator"}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -551,23 +849,12 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="sm:col-span-2 space-y-1">
-                    <label className="font-medium text-[var(--foreground)]">
-                      Contract Document URL
-                    </label>
-                    <Input
-                      placeholder="https://drive.google.com/contract..."
-                      value={contractDocUrl}
-                      onChange={(e) => setContractDocUrl(e.target.value)}
-                      className="text-xs"
-                    />
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1">
-                    <label className="font-medium text-[var(--foreground)]">Agreed Amount ($)</label>
+                    <label className="font-medium text-[var(--foreground)]">Agreed Amount (₹ INR)</label>
                     <Input
                       type="number"
-                      placeholder="4000"
+                      placeholder="e.g. 75000"
                       value={agreedAmount ?? ""}
                       onChange={(e) =>
                         setAgreedAmount(e.target.value ? Number(e.target.value) : undefined)
@@ -575,9 +862,6 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                       className="text-xs"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1">
                     <label className="font-medium text-[var(--foreground)]">
                       Signed / Effective Date
@@ -589,17 +873,95 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                       className="text-xs"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-[var(--foreground)]">
-                      Functional Spec Notes
-                    </label>
-                    <Input
-                      placeholder="e.g. 50% upfront, milestone 2 on staging"
-                      value={functionalRequirements}
-                      onChange={(e) => setFunctionalRequirements(e.target.value)}
-                      className="text-xs"
-                    />
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <label className="font-medium text-[var(--foreground)]">
+                    Functional Spec &amp; Payment Notes
+                  </label>
+                  <Input
+                    placeholder="e.g. 50% upfront, milestone 2 on staging"
+                    value={functionalRequirements}
+                    onChange={(e) => setFunctionalRequirements(e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+
+                {/* Contract Form Generator Section */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="w-4 h-4 text-emerald-400" />
+                      <span className="font-bold text-zinc-200 text-xs">Freelance Contract Agreement</span>
+                    </div>
+                    {contractData && (
+                      <Badge variant="offer" className="text-[10px]">Agreement Ready</Badge>
+                    )}
                   </div>
+
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Standard freelance agreement generated via form with developer name, client name, IP ownership transfer, payment terms &amp; warranty.
+                  </p>
+
+                  {contractData ? (
+                    <div className="p-3 bg-[var(--surface)] border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Developer</span>
+                          <span className="font-medium text-emerald-300">{contractData.developerName}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Client</span>
+                          <span className="font-medium text-emerald-300">{contractData.clientName || client?.contactName}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Agreed Amount</span>
+                          <span className="font-medium text-emerald-300">₹{contractData.agreedAmount.toLocaleString("en-IN")} {contractData.currency || "INR"}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={() =>
+                            setViewerDoc({
+                              isOpen: true,
+                              title: `Contract - ${companyName || contactName}`,
+                              type: "contract",
+                              data: contractData,
+                            })
+                          }
+                          className="text-xs flex items-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View &amp; Print Contract (PDF)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsContractGenOpen(true)}
+                          className="text-xs"
+                        >
+                          Edit Terms
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsContractGenOpen(true)}
+                        className="text-xs flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        Generate Contract Agreement Form
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             )}
@@ -754,6 +1116,86 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                     className="text-xs"
                   />
                 </div>
+
+                {/* Handover Document Form Generator Section */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="w-4 h-4 text-emerald-400" />
+                      <span className="font-bold text-zinc-200 text-xs">Project Handover &amp; Acceptance Spec</span>
+                    </div>
+                    {handoverData && (
+                      <Badge variant="offer" className="text-[10px]">Handover Ready</Badge>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Standard production handover document generated via template with developer name, client name, credentials transfer checklist, deployment URLs &amp; warranty sign-off.
+                  </p>
+
+                  {handoverData ? (
+                    <div className="p-3 bg-[var(--surface)] border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Developer</span>
+                          <span className="font-medium text-emerald-300">{handoverData.developerName}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Handover Date</span>
+                          <span className="font-medium text-emerald-300">{handoverData.handoverDate}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--muted)] block">Assets Transferred</span>
+                          <span className="font-medium text-emerald-300">
+                            {handoverData.credentialsChecklist?.filter((c) => c.transferred).length || 0} /{" "}
+                            {handoverData.credentialsChecklist?.length || 0}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={() =>
+                            setViewerDoc({
+                              isOpen: true,
+                              title: `Handover Spec - ${companyName || contactName}`,
+                              type: "handover",
+                              data: handoverData,
+                            })
+                          }
+                          className="text-xs flex items-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View &amp; Print Handover (PDF)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsHandoverGenOpen(true)}
+                          className="text-xs"
+                        >
+                          Edit Handover Spec
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsHandoverGenOpen(true)}
+                        className="text-xs flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        Generate Handover Spec Form
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </Card>
             )}
 
@@ -899,6 +1341,67 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         confirmText={deleting ? "Deleting..." : "Delete Client"}
         variant="danger"
         loading={deleting}
+      />
+
+      {/* SOW Document Generator Modal */}
+      <SowGeneratorModal
+        isOpen={isSowGenOpen}
+        onClose={() => setIsSowGenOpen(false)}
+        clientId={clientId}
+        initialData={{
+          clientName: contactName,
+          companyName: companyName,
+          projectTitle: `${companyName || "Client"} Web Application`,
+          estimatedBudget: budgetEstimate || 35000,
+          currency: "INR",
+          ...sowData,
+        }}
+        onSaveToClient={handleSaveSow}
+      />
+
+      {/* Contract Agreement Generator Modal */}
+      <ContractGeneratorModal
+        isOpen={isContractGenOpen}
+        onClose={() => setIsContractGenOpen(false)}
+        clientId={clientId}
+        initialData={{
+          clientName: contactName,
+          companyName: companyName,
+          projectTitle: `${companyName || "Client"} Web Application`,
+          agreedAmount: agreedAmount || budgetEstimate || 45000,
+          currency: "INR",
+          effectiveDate: signedDate,
+          ...contractData,
+        }}
+        onSaveToClient={handleSaveContract}
+      />
+
+      {/* Handover Spec Generator Modal */}
+      <HandoverGeneratorModal
+        isOpen={isHandoverGenOpen}
+        onClose={() => setIsHandoverGenOpen(false)}
+        clientId={clientId}
+        initialData={{
+          clientName: contactName,
+          companyName: companyName,
+          projectTitle: `${companyName || "Client"} Web Application`,
+          productionUrl: productionUrl,
+          stagingUrl: stagingUrl,
+          repositoryUrl: repositoryUrl,
+          handoverDate: deploymentDate,
+          maintenanceNotes: handoverNotes,
+          ...handoverData,
+        }}
+        onSaveToClient={handleSaveHandover}
+      />
+
+      {/* Universal Document Viewer Modal (Print / Save as PDF) */}
+      <DocumentViewerModal
+        isOpen={viewerDoc.isOpen}
+        onClose={() => setViewerDoc((prev) => ({ ...prev, isOpen: false }))}
+        title={viewerDoc.title}
+        type={viewerDoc.type}
+        data={viewerDoc.data}
       />
     </div>
   );

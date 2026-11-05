@@ -13,6 +13,16 @@ import {
   FreelanceResourceCategory,
 } from "@/types/freelance-resource";
 import {
+  IFreelanceClient,
+  ISowDocumentData,
+  IContractDocumentData,
+  IHandoverDocumentData,
+} from "@/types/freelance-client";
+import SowGeneratorModal from "@/components/freelance/documents/sow-generator-modal";
+import ContractGeneratorModal from "@/components/freelance/documents/contract-generator-modal";
+import HandoverGeneratorModal from "@/components/freelance/documents/handover-generator-modal";
+import DocumentViewerModal from "@/components/freelance/documents/document-viewer-modal";
+import {
   ExternalLink,
   Copy,
   Check,
@@ -22,6 +32,9 @@ import {
   ClipboardList,
   Edit2,
   Save,
+  FileText,
+  FileCheck,
+  Sparkles,
 } from "lucide-react";
 
 const CATEGORIES: Array<FreelanceResourceCategory | "All"> = [
@@ -39,6 +52,31 @@ export default function FreelanceResourcesView() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
+  // Clients list for document generators
+  const [clients, setClients] = useState<IFreelanceClient[]>([]);
+  const [selectedClientIdSow, setSelectedClientIdSow] = useState<string>("");
+  const [selectedClientIdContract, setSelectedClientIdContract] = useState<string>("");
+  const [selectedClientIdHandover, setSelectedClientIdHandover] = useState<string>("");
+
+  // Document Generator Modals
+  const [isSowModalOpen, setIsSowModalOpen] = useState(false);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
+
+  // Viewer Modal
+  const [viewerDoc, setViewerDoc] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: "sow" | "contract" | "handover";
+    data: ISowDocumentData | IContractDocumentData | IHandoverDocumentData | null;
+  }>({
+    isOpen: false,
+    title: "",
+    type: "sow",
+    data: null,
+  });
+
   // Google Form specific state
   const [formUrl, setFormUrl] = useState(
     "https://docs.google.com/forms/d/e/1FAIpQLSc-sample-intake-form/viewform"
@@ -54,6 +92,22 @@ export default function FreelanceResourcesView() {
   const [newDescription, setNewDescription] = useState("");
   const [newIsPinned, setNewIsPinned] = useState(false);
   const [savingResource, setSavingResource] = useState(false);
+
+  const fetchClients = useCallback(async () => {
+    try {
+      const res = await fetch("/api/freelance/clients");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setClients(json.data);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const fetchResources = useCallback(async () => {
     try {
@@ -104,6 +158,72 @@ export default function FreelanceResourcesView() {
       } catch {
         // silent
       }
+    }
+  };
+
+  const handleSaveSowToClient = async (data: ISowDocumentData) => {
+    if (!selectedClientIdSow) return;
+    try {
+      await fetch(`/api/freelance/clients/${selectedClientIdSow}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scoping: {
+            sowData: data,
+            budgetEstimate: data.estimatedBudget,
+          },
+        }),
+      });
+      setNotification("SOW generated and saved to client record!");
+      setTimeout(() => setNotification(null), 3000);
+      fetchClients();
+    } catch {
+      setNotification("Failed to save SOW to client");
+    }
+  };
+
+  const handleSaveContractToClient = async (data: IContractDocumentData) => {
+    if (!selectedClientIdContract) return;
+    try {
+      await fetch(`/api/freelance/clients/${selectedClientIdContract}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contract: {
+            contractData: data,
+            agreedAmount: data.agreedAmount,
+            signedDate: data.effectiveDate,
+          },
+        }),
+      });
+      setNotification("Contract generated and saved to client record!");
+      setTimeout(() => setNotification(null), 3000);
+      fetchClients();
+    } catch {
+      setNotification("Failed to save contract to client");
+    }
+  };
+
+  const handleSaveHandoverToClient = async (data: IHandoverDocumentData) => {
+    if (!selectedClientIdHandover) return;
+    try {
+      await fetch(`/api/freelance/clients/${selectedClientIdHandover}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          launch: {
+            productionUrl: data.productionUrl,
+            deploymentDate: data.handoverDate,
+            handoverNotes: data.maintenanceNotes,
+            handoverData: data,
+          },
+        }),
+      });
+      setNotification("Handover spec generated and saved to client record!");
+      setTimeout(() => setNotification(null), 3000);
+      fetchClients();
+    } catch {
+      setNotification("Failed to save handover to client");
     }
   };
 
@@ -174,6 +294,18 @@ export default function FreelanceResourcesView() {
     }
   };
 
+  const selectedClientSow = clients.find((c) => c._id === selectedClientIdSow);
+  const selectedClientContract = clients.find((c) => c._id === selectedClientIdContract);
+  const selectedClientHandover = clients.find((c) => c._id === selectedClientIdHandover);
+
+  const clientOptions = [
+    { value: "", label: "-- Standalone / Unassigned --" },
+    ...clients.map((c) => ({
+      value: c._id || "",
+      label: `${c.companyName} (${c.contactName})`,
+    })),
+  ];
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Header */}
@@ -207,6 +339,153 @@ export default function FreelanceResourcesView() {
               Back to Pipeline
             </Button>
           </Link>
+        </div>
+      </div>
+
+      {/* Document Generator Hub */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider">
+              Document Generators &amp; Templates
+            </h2>
+          </div>
+          <span className="text-[11px] text-[var(--muted)]">
+            Generate formal SOWs, contracts &amp; handover specs with printable PDF exports
+          </span>
+        </div>
+
+        {notification && (
+          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Statement of Work (SOW) */}
+          <Card className="p-4 border-amber-500/20 bg-amber-500/5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4" />
+                  1. Scope &amp; SOW Document
+                </span>
+                <Badge variant="interview" className="text-[10px]">Scoping</Badge>
+              </div>
+              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                Define deliverables, out-of-scope boundaries, payment milestones &amp; timeline. Attached during Scoping stage.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--muted)] block mb-1">
+                  Assign to Client (Optional):
+                </label>
+                <Select
+                  value={selectedClientIdSow}
+                  onChange={setSelectedClientIdSow}
+                  options={clientOptions}
+                  className="text-xs"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setIsSowModalOpen(true)}
+                className="w-full text-xs flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Open SOW Generator</span>
+              </Button>
+            </div>
+          </Card>
+
+          {/* Card 2: Freelance Contract Agreement */}
+          <Card className="p-4 border-emerald-500/20 bg-emerald-500/5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <FileCheck className="w-4 h-4" />
+                  2. Freelance Contract
+                </span>
+                <Badge variant="offer" className="text-[10px]">Contract</Badge>
+              </div>
+              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                Formal developer agreement covering agreed amount, IP ownership transfer, confidentiality &amp; governing law.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--muted)] block mb-1">
+                  Assign to Client (Optional):
+                </label>
+                <Select
+                  value={selectedClientIdContract}
+                  onChange={setSelectedClientIdContract}
+                  options={clientOptions}
+                  className="text-xs"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setIsContractModalOpen(true)}
+                className="w-full text-xs flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Open Contract Generator</span>
+              </Button>
+            </div>
+          </Card>
+
+          {/* Card 3: Project Handover Document */}
+          <Card className="p-4 border-teal-500/20 bg-teal-500/5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-teal-400 flex items-center gap-1.5">
+                  <FileCheck className="w-4 h-4" />
+                  3. Project Handover Spec
+                </span>
+                <Badge variant="applied" className="text-[10px]">Launch</Badge>
+              </div>
+              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                Delivery document with credentials checklist, repository endpoints, deployment URLs &amp; 30-day warranty.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--muted)] block mb-1">
+                  Assign to Client (Optional):
+                </label>
+                <Select
+                  value={selectedClientIdHandover}
+                  onChange={setSelectedClientIdHandover}
+                  options={clientOptions}
+                  className="text-xs"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setIsHandoverModalOpen(true)}
+                className="w-full text-xs flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Open Handover Generator</span>
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
 
@@ -306,7 +585,7 @@ export default function FreelanceResourcesView() {
             <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-1">
               <span className="font-semibold text-[var(--foreground)] block">3. Budget &amp; Timeline</span>
               <p className="text-[11px] leading-relaxed">
-                Budget range ($ USD), target launch date, and third-party integrations needed (Stripe, Supabase, etc.).
+                Budget range (₹ INR), target launch date, and third-party integrations needed (Stripe, Supabase, etc.).
               </p>
             </div>
           </div>
@@ -504,6 +783,82 @@ export default function FreelanceResourcesView() {
           </div>
         </div>
       )}
+
+      {/* SOW Document Generator Modal */}
+      <SowGeneratorModal
+        isOpen={isSowModalOpen}
+        onClose={() => setIsSowModalOpen(false)}
+        clientId={selectedClientIdSow || undefined}
+        initialData={
+          selectedClientSow
+            ? {
+                clientName: selectedClientSow.contactName,
+                companyName: selectedClientSow.companyName,
+                projectTitle: `${selectedClientSow.companyName} Web Application`,
+                estimatedBudget: selectedClientSow.scoping?.budgetEstimate || 35000,
+                currency: "INR",
+                ...selectedClientSow.scoping?.sowData,
+              }
+            : { currency: "INR", estimatedBudget: 35000 }
+        }
+        onSaveToClient={selectedClientIdSow ? handleSaveSowToClient : undefined}
+      />
+
+      {/* Contract Agreement Generator Modal */}
+      <ContractGeneratorModal
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+        clientId={selectedClientIdContract || undefined}
+        initialData={
+          selectedClientContract
+            ? {
+                clientName: selectedClientContract.contactName,
+                companyName: selectedClientContract.companyName,
+                projectTitle: `${selectedClientContract.companyName} Web Application`,
+                agreedAmount:
+                  selectedClientContract.contract?.agreedAmount ||
+                  selectedClientContract.scoping?.budgetEstimate ||
+                  45000,
+                currency: "INR",
+                effectiveDate: selectedClientContract.contract?.signedDate,
+                ...selectedClientContract.contract?.contractData,
+              }
+            : { currency: "INR", agreedAmount: 45000 }
+        }
+        onSaveToClient={selectedClientIdContract ? handleSaveContractToClient : undefined}
+      />
+
+      {/* Handover Spec Generator Modal */}
+      <HandoverGeneratorModal
+        isOpen={isHandoverModalOpen}
+        onClose={() => setIsHandoverModalOpen(false)}
+        clientId={selectedClientIdHandover || undefined}
+        initialData={
+          selectedClientHandover
+            ? {
+                clientName: selectedClientHandover.contactName,
+                companyName: selectedClientHandover.companyName,
+                projectTitle: `${selectedClientHandover.companyName} Web Application`,
+                productionUrl: selectedClientHandover.launch?.productionUrl,
+                stagingUrl: selectedClientHandover.build?.stagingUrl,
+                repositoryUrl: selectedClientHandover.build?.repositoryUrl,
+                handoverDate: selectedClientHandover.launch?.deploymentDate,
+                maintenanceNotes: selectedClientHandover.launch?.handoverNotes,
+                ...selectedClientHandover.launch?.handoverData,
+              }
+            : undefined
+        }
+        onSaveToClient={selectedClientIdHandover ? handleSaveHandoverToClient : undefined}
+      />
+
+      {/* Universal Document Viewer Modal (Print / Save as PDF) */}
+      <DocumentViewerModal
+        isOpen={viewerDoc.isOpen}
+        onClose={() => setViewerDoc((prev) => ({ ...prev, isOpen: false }))}
+        title={viewerDoc.title}
+        type={viewerDoc.type}
+        data={viewerDoc.data}
+      />
     </div>
   );
 }

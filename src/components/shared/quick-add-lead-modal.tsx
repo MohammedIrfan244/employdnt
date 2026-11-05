@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
 import { X, Building2, User, Globe, Mail, Phone, Calendar, Sparkles } from "lucide-react";
+import { useClientDate } from "@/hooks/use-client-date";
 import { LeadSource } from "@/types/freelance-client";
 
 interface QuickAddLeadModalProps {
@@ -30,7 +31,7 @@ export default function QuickAddLeadModal({
   onClose,
   onSuccess,
 }: QuickAddLeadModalProps) {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const { todayString } = useClientDate();
 
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
@@ -39,12 +40,18 @@ export default function QuickAddLeadModal({
   const [mobile, setMobile] = useState("");
   const [website, setWebsite] = useState("");
   const [leadSource, setLeadSource] = useState<LeadSource>("LinkedIn");
-  const [outreachDate, setOutreachDate] = useState(todayStr);
+  const [outreachDate, setOutreachDate] = useState("");
   const [stageDueDate, setStageDueDate] = useState("");
   const [initialNotes, setInitialNotes] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (todayString && !outreachDate) {
+      setOutreachDate(todayString);
+    }
+  }, [todayString, outreachDate]);
 
   if (!isOpen) return null;
 
@@ -58,6 +65,8 @@ export default function QuickAddLeadModal({
     setLoading(true);
     setError(null);
 
+    const submissionDate = outreachDate || todayString || "";
+
     try {
       const res = await fetch("/api/freelance/clients", {
         method: "POST",
@@ -70,7 +79,7 @@ export default function QuickAddLeadModal({
           mobile,
           website,
           leadSource,
-          outreachDate: outreachDate || todayStr,
+          outreachDate: submissionDate,
           stageDueDate: stageDueDate || undefined,
           initialNotes,
         }),
