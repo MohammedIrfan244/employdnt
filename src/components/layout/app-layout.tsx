@@ -5,6 +5,7 @@ import Navbar from "./navbar";
 import Footer from "./footer";
 import FloatingWindow from "./floating-window";
 import QuickAddModal from "@/components/shared/quick-add-modal";
+import QuickAddLeadModal from "@/components/shared/quick-add-lead-modal";
 
 interface AppLayoutProps {
   children?: React.ReactNode;
@@ -12,12 +13,16 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isQuickAddLeadOpen, setIsQuickAddLeadOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
       {/* Top Navbar */}
       <Suspense fallback={<div className="h-16 border-b border-[var(--border)] bg-[var(--background)]/90" />}>
-        <Navbar onOpenQuickAdd={() => setIsQuickAddOpen(true)} />
+        <Navbar
+          onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          onOpenQuickAddLead={() => setIsQuickAddLeadOpen(true)}
+        />
       </Suspense>
 
       {/* Main Container with Floating Window on Side & Content */}
@@ -34,10 +39,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Bottom Footer */}
       <Footer />
 
-      {/* Quick Add Modal */}
+      {/* Quick Add Modal (Job Applications) */}
       <QuickAddModal
         isOpen={isQuickAddOpen}
         onClose={() => setIsQuickAddOpen(false)}
+        onSuccess={() => {
+          if (typeof window !== "undefined") {
+            window.location.reload();
+          }
+        }}
+      />
+
+      {/* Quick Add Lead Modal (Freelance CRM) */}
+      <QuickAddLeadModal
+        isOpen={isQuickAddLeadOpen}
+        onClose={() => setIsQuickAddLeadOpen(false)}
         onSuccess={() => {
           if (typeof window !== "undefined") {
             window.location.reload();

@@ -9,7 +9,7 @@ import Badge from "@/components/ui/badge";
 import FollowUpDraftModal from "@/components/shared/follow-up-draft-modal";
 import { Calendar, Check, CheckCircle2, Mail, ArrowUpRight } from "lucide-react";
 import { IApplication } from "@/types/application";
-import { IFollowUpOverview } from "@/services/follow-up.service";
+import type { IFollowUpOverview } from "@/services/follow-up.service";
 
 export default function FollowUpView() {
   const { isClient, todayString, formatDate } = useClientDate();
