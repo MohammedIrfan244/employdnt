@@ -27,7 +27,142 @@ export default function DocumentViewerModal({
   if (!isOpen || !data) return null;
 
   const handlePrint = () => {
-    window.print();
+    const printElement = document.getElementById("printable-doc-paper");
+    if (!printElement) {
+      window.print();
+      return;
+    }
+
+    // Create an isolated hidden iframe for clean 1-page/exact printing without parent scroll DOM duplication
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm 15mm;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #18181b;
+              background: #ffffff;
+              font-size: 10.5pt;
+              line-height: 1.45;
+              padding: 5mm;
+            }
+            .space-y-6 > * + * { margin-top: 1.25rem; }
+            .space-y-5 > * + * { margin-top: 1rem; }
+            .space-y-4 > * + * { margin-top: 0.85rem; }
+            .space-y-3 > * + * { margin-top: 0.65rem; }
+            .space-y-2 > * + * { margin-top: 0.45rem; }
+            .space-y-1\\.5 > * + * { margin-top: 0.35rem; }
+            .space-y-1 > * + * { margin-top: 0.25rem; }
+            .space-y-0\\.5 > * + * { margin-top: 0.125rem; }
+
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            .gap-4 { gap: 1rem; }
+            .gap-3 { gap: 0.75rem; }
+            .gap-2 { gap: 0.5rem; }
+            .gap-8 { gap: 2rem; }
+
+            .border { border: 1px solid #e4e4e7; }
+            .border-b { border-bottom: 1px solid #e4e4e7; }
+            .border-b-2 { border-bottom: 2px solid #18181b; }
+            .border-t-2 { border-top: 2px solid #18181b; }
+            .border-zinc-900 { border-color: #18181b; }
+            .border-zinc-200 { border-color: #e4e4e7; }
+            .border-zinc-400 { border-color: #a1a1aa; }
+
+            .p-4 { padding: 0.85rem; }
+            .p-3 { padding: 0.65rem; }
+            .p-2\\.5 { padding: 0.5rem; }
+            .pb-4 { padding-bottom: 0.85rem; }
+            .pb-1 { padding-bottom: 0.25rem; }
+            .pt-10 { padding-top: 1.5rem; }
+            .rounded { border-radius: 0.25rem; }
+            .rounded-lg { border-radius: 0.375rem; }
+
+            .bg-zinc-50 { background-color: #f8fafc; }
+            .text-zinc-950 { color: #09090b; }
+            .text-zinc-900 { color: #18181b; }
+            .text-zinc-800 { color: #27272a; }
+            .text-zinc-700 { color: #3f3f46; }
+            .text-zinc-600 { color: #52525b; }
+            .text-zinc-500 { color: #71717a; }
+            .text-emerald-700 { color: #047857; }
+
+            .text-xs { font-size: 0.75rem; }
+            .text-sm { font-size: 0.85rem; }
+            .text-base { font-size: 0.95rem; }
+            .text-2xl { font-size: 1.35rem; }
+
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+            .font-black { font-weight: 900; }
+            .uppercase { text-transform: uppercase; }
+            .tracking-widest { letter-spacing: 0.1em; }
+            .tracking-wider { letter-spacing: 0.05em; }
+            .tracking-tight { letter-spacing: -0.025em; }
+            .italic { font-style: italic; }
+            .font-serif { font-family: Georgia, Cambria, "Times New Roman", Times, serif; }
+            .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .items-start { align-items: flex-start; }
+            .items-end { align-items: flex-end; }
+            .justify-between { justify-content: space-between; }
+            .block { display: block; }
+            .h-10 { height: 2rem; }
+            .whitespace-pre-wrap { white-space: pre-wrap; }
+            .break-all { word-break: break-all; }
+            .divide-y > * + * { border-top: 1px solid #e4e4e7; }
+            ul { padding-left: 1.25rem; list-style-type: disc; }
+            li { margin-bottom: 0.2rem; }
+            svg { display: inline-block; vertical-align: middle; }
+          </style>
+        </head>
+        <body>
+          ${printElement.innerHTML}
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    }, 250);
   };
 
   return (
@@ -63,29 +198,7 @@ export default function DocumentViewerModal({
 
         {/* Printable Document Paper */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-10 bg-white text-zinc-900 print:p-0 print:m-0 print:overflow-visible font-sans leading-relaxed text-sm">
-          <style jsx global>{`
-            @media print {
-              body * {
-                visibility: hidden;
-              }
-              .print-container,
-              .print-container * {
-                visibility: visible;
-              }
-              .print-container {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 20mm;
-                background: white !important;
-                color: black !important;
-              }
-            }
-          `}</style>
-
-          <div className="print-container max-w-3xl mx-auto space-y-6">
+          <div id="printable-doc-paper" className="print-container max-w-3xl mx-auto space-y-6">
             {/* Document Header */}
             <div className="border-b-2 border-zinc-900 pb-4 flex justify-between items-start gap-4">
               <div>

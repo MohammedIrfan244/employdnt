@@ -652,17 +652,42 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
 
             {/* Stage 2: Scoping (Requirements, Scope Doc, Budget) */}
             {currentStageIndex >= 1 && (
-              <Card className="p-5 space-y-4 border-amber-500/20 bg-amber-500/5">
+              <Card
+                className={`p-5 space-y-4 ${
+                  sowData || scopeDocUrl
+                    ? currentStage === "Scoping"
+                      ? "border-emerald-500/20 bg-emerald-500/5"
+                      : "border-[var(--border)] bg-[var(--surface)]"
+                    : "border-amber-500/20 bg-amber-500/5"
+                }`}
+              >
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-amber-400" />
-                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    {sowData || scopeDocUrl ? (
+                      <FileCheck className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-amber-400" />
+                    )}
+                    <h3
+                      className={`text-xs font-bold uppercase tracking-wider ${
+                        sowData || scopeDocUrl ? "text-emerald-400" : "text-amber-400"
+                      }`}
+                    >
                       2. Scoping Details &amp; SOW
                     </h3>
                   </div>
-                  {currentStage === "Scoping" && (
-                    <Badge variant="interview" className="text-[10px]">Active Stage</Badge>
-                  )}
+                  {currentStage === "Scoping" ? (
+                    <Badge
+                      variant={sowData || scopeDocUrl ? "offer" : "interview"}
+                      className="text-[10px]"
+                    >
+                      Active Stage
+                    </Badge>
+                  ) : sowData || scopeDocUrl ? (
+                    <Badge variant="offer" className="text-[10px]">
+                      SOW Attached
+                    </Badge>
+                  ) : null}
                 </div>
 
                 <div className="space-y-3 text-xs">
@@ -694,115 +719,62 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                     />
                   </div>
 
-                  {/* SOW Dual-Option Section (Manual Upload or Form Generator) */}
+                  {/* SOW Document Section: When attached, shows clean single attached card just like Contract */}
                   <div className="pt-2 border-t border-[var(--border)] space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-amber-400" />
-                        Scope Document / SOW
-                      </span>
-                      <span className="text-[10px] text-[var(--muted)]">
-                        Manual PDF upload or form-based generator
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="font-bold text-zinc-200 text-xs">
+                          Statement of Work (SOW)
+                        </span>
+                      </div>
+                      {(sowData || scopeDocUrl) && (
+                        <Badge variant="offer" className="text-[10px]">
+                          {sowData ? "SOW Specification Ready" : "PDF Attached"}
+                        </Badge>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Option A: Manual PDF Upload */}
-                      <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                              <FileUp className="w-3.5 h-3.5 text-amber-400" />
-                              Manual PDF Document
+                    {sowData ? (
+                      /* Option 1 Attached: Form-Generated SOW */
+                      <div className="p-3 bg-[var(--surface)] border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <span className="text-[10px] text-[var(--muted)] block">Developer</span>
+                            <span className="font-medium text-emerald-300">
+                              {sowData.developerName}
                             </span>
-                            {scopeDocUrl && (
-                              <Badge variant="interview" className="text-[10px]">Attached</Badge>
-                            )}
                           </div>
-                          <p className="text-[10px] text-[var(--muted)]">
-                            Upload your custom SOW proposal as a PDF file.
-                          </p>
+                          <div>
+                            <span className="text-[10px] text-[var(--muted)] block">Client</span>
+                            <span className="font-medium text-emerald-300">
+                              {sowData.clientName || client?.contactName}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[var(--muted)] block">
+                              Estimated Budget
+                            </span>
+                            <span className="font-medium text-emerald-300">
+                              ₹{sowData.estimatedBudget?.toLocaleString("en-IN")}{" "}
+                              {sowData.currency || "INR"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-[var(--muted)] block">Timeline</span>
+                            <span className="font-medium text-emerald-300">
+                              {sowData.timelineWeeks
+                                ? `${sowData.timelineWeeks} Weeks`
+                                : "Milestone-based"}
+                            </span>
+                          </div>
                         </div>
 
-                        {scopeDocUrl ? (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between text-xs p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                              <span className="truncate max-w-[150px] font-medium text-amber-300 text-[11px]">
-                                {scopeDocFileName || "SOW-Document.pdf"}
-                              </span>
-                              <a
-                                href={scopeDocUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                download={scopeDocFileName || "SOW-Document.pdf"}
-                                className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-semibold"
-                              >
-                                <Download className="w-3 h-3" /> Download / View
-                              </a>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px] px-1">
-                              <label className="text-[var(--muted)] hover:text-white cursor-pointer underline">
-                                Replace file
-                                <input
-                                  type="file"
-                                  accept=".pdf,application/pdf"
-                                  className="hidden"
-                                  onChange={handleSowFileUpload}
-                                  disabled={uploadingSow}
-                                />
-                              </label>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setScopeDocUrl("");
-                                  setScopeDocFileName("");
-                                }}
-                                className="text-red-400 hover:underline cursor-pointer"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center p-3 border border-dashed border-zinc-700 hover:border-amber-500/50 rounded-lg cursor-pointer bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors">
-                            <Upload className="w-4 h-4 text-amber-400 mb-1" />
-                            <span className="text-xs text-zinc-300 font-medium">
-                              {uploadingSow ? "Uploading PDF..." : "Upload Scope PDF"}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted)]">Select PDF from computer</span>
-                            <input
-                              type="file"
-                              accept=".pdf,application/pdf"
-                              className="hidden"
-                              onChange={handleSowFileUpload}
-                              disabled={uploadingSow}
-                            />
-                          </label>
-                        )}
-                      </div>
-
-                      {/* Option B: Form SOW Generator */}
-                      <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                              Generate SOW Form
-                            </span>
-                            {sowData && (
-                              <Badge variant="offer" className="text-[10px]">Form Ready</Badge>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-[var(--muted)]">
-                            Generate standardized SOW with deliverables, budget &amp; terms.
-                          </p>
-                        </div>
-
-                        <div className="pt-2 flex items-center gap-2">
-                          {sowData && (
+                        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                          <div className="flex items-center gap-2">
                             <Button
                               type="button"
-                              variant="secondary"
+                              variant="primary"
                               size="sm"
                               onClick={() =>
                                 setViewerDoc({
@@ -812,23 +784,165 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                                   data: sowData,
                                 })
                               }
-                              className="text-xs flex items-center gap-1.5 flex-1"
+                              className="text-xs flex items-center gap-1.5"
                             >
-                              <Eye className="w-3 h-3" /> View &amp; Print
+                              <Eye className="w-3.5 h-3.5" /> View &amp; Print SOW (PDF)
                             </Button>
-                          )}
-                          <Button
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsSowGenOpen(true)}
+                              className="text-xs"
+                            >
+                              Edit SOW Form
+                            </Button>
+                          </div>
+
+                          <button
                             type="button"
-                            variant={sowData ? "ghost" : "secondary"}
-                            size="sm"
-                            onClick={() => setIsSowGenOpen(true)}
-                            className="text-xs flex-1"
+                            onClick={async () => {
+                              setSowData(undefined);
+                              await fetch(`/api/freelance/clients/${clientId}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  scoping: {
+                                    requirementsSummary,
+                                    scopeDocUrl,
+                                    scopeDocFileName,
+                                    sowData: null,
+                                    budgetEstimate,
+                                  },
+                                }),
+                              });
+                            }}
+                            className="text-[11px] text-[var(--muted)] hover:text-red-400 cursor-pointer underline"
                           >
-                            {sowData ? "Edit Form" : "Open Generator"}
-                          </Button>
+                            Switch / Upload PDF Instead
+                          </button>
                         </div>
                       </div>
-                    </div>
+                    ) : scopeDocUrl ? (
+                      /* Option 2 Attached: Uploaded Manual PDF */
+                      <div className="p-3 bg-[var(--surface)] border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileUp className="w-4 h-4 text-emerald-400" />
+                            <span className="font-medium text-[var(--foreground)]">
+                              {scopeDocFileName || "SOW-Document.pdf"}
+                            </span>
+                            <Badge variant="offer" className="text-[10px]">
+                              Attached PDF
+                            </Badge>
+                          </div>
+                          <a
+                            href={scopeDocUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={scopeDocFileName || "SOW-Document.pdf"}
+                            className="text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download / View PDF
+                          </a>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)] text-[11px]">
+                          <label className="text-[var(--muted)] hover:text-white cursor-pointer underline">
+                            Replace PDF
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={handleSowFileUpload}
+                              disabled={uploadingSow}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setScopeDocUrl("");
+                              setScopeDocFileName("");
+                              await fetch(`/api/freelance/clients/${clientId}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  scoping: {
+                                    requirementsSummary,
+                                    scopeDocUrl: "",
+                                    scopeDocFileName: "",
+                                    sowData,
+                                    budgetEstimate,
+                                  },
+                                }),
+                              });
+                            }}
+                            className="text-red-400 hover:underline cursor-pointer"
+                          >
+                            Remove Document
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Option 3: Neither Attached yet - Show dual choice */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Option A: Manual PDF Upload */}
+                        <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
+                          <div>
+                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 mb-1">
+                              <FileUp className="w-3.5 h-3.5 text-amber-400" />
+                              Manual PDF Document
+                            </span>
+                            <p className="text-[10px] text-[var(--muted)]">
+                              Upload your custom SOW proposal as a PDF file.
+                            </p>
+                          </div>
+
+                          <label className="flex flex-col items-center justify-center p-3 border border-dashed border-zinc-700 hover:border-amber-500/50 rounded-lg cursor-pointer bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors">
+                            <Upload className="w-4 h-4 text-amber-400 mb-1" />
+                            <span className="text-xs text-zinc-300 font-medium">
+                              {uploadingSow ? "Uploading PDF..." : "Upload Scope PDF"}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted)]">
+                              Select PDF from computer
+                            </span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={handleSowFileUpload}
+                              disabled={uploadingSow}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Option B: Form SOW Generator */}
+                        <div className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl space-y-2 flex flex-col justify-between">
+                          <div>
+                            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 mb-1">
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                              Generate SOW Form
+                            </span>
+                            <p className="text-[10px] text-[var(--muted)]">
+                              Generate standardized SOW with deliverables, budget &amp; terms.
+                            </p>
+                          </div>
+
+                          <div className="pt-2">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setIsSowGenOpen(true)}
+                              className="text-xs w-full flex items-center justify-center gap-1.5"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Open SOW Generator</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
