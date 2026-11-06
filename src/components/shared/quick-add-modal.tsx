@@ -270,7 +270,7 @@ export default function QuickAddModal({ isOpen, onClose, onSuccess }: QuickAddMo
                   label="Salary / Pay"
                   value={salary}
                   onChange={(e) => setSalary(e.target.value)}
-                  placeholder="e.g. $130k or $65/hr"
+                  placeholder="e.g. ₹18 LPA or ₹1.5L/mo"
                 />
 
                 <Textarea

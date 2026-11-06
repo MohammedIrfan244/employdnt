@@ -6,17 +6,17 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ## Current Status Overview
 
-- **Active Phase:** Phase 3 — Gmail Integration (Complete) ➔ Ready for Phase 4: Supporting Modules
-- **Active Step:** Phase 3 Verification on `g-mail` feature branch
-- **Current Milestone:** OAuth read-only scope, targeted recruitment email scanner, smart application matching engine, status transition proposals, and Settings Gmail connection management operational.
+- **Active Phase:** Phase 4 — Supporting Modules (Complete) ➔ Ready for Phase 5: Polish & Optimization
+- **Active Step:** Phase 4 Verification & Documentation Update
+- **Current Milestone:** Multi-tenant user data isolation, Profile management, Multi-version Resume tracker, Resource bookmark library, and User preferences (follow-up cadence & daily target baseline) fully implemented and verified.
 
 | Phase | Description | Reference (`plan.md`) | Status |
 |---|---|---|---|
 | **Phase 1** | Core Application (CRUD, Categories, Progressive Goals, Dashboard) | Modules 1, 2, 5, 9, 11 | **COMPLETED** ✅ |
 | **Phase 2** | Follow-Up Assistant (Auto-scheduling, Needs Attention, Drafts) | Modules 1.4, 3, 8 | **COMPLETED** ✅ |
 | **Phase 3** | Gmail Integration (OAuth, detection, matching, alerts) | Modules 4, 8 | **COMPLETED** ✅ |
-| **Phase 4** | Supporting Modules (Profile, Resumes, Resources, Settings) | Modules 6, 7, 10 | **NEXT UP** 🟡 |
-| **Phase 5** | Polish & Optimization (Responsive, accessibility, error handling) | Modules 9.4, 12 | PENDING ⚪ |
+| **Phase 4** | Supporting Modules (Multi-Tenant, Profile, Resumes, Resources, Settings) | Modules 6, 7, 8, 10 | **COMPLETED** ✅ |
+| **Phase 5** | Polish & Optimization (Responsive, accessibility, error handling) | Modules 9.4, 12 | **NEXT UP** 🟡 |
 
 ---
 
@@ -137,17 +137,55 @@ This document tracks implementation status across all phases defined in [docs/pl
 
 ---
 
-## Phase 4: Supporting Modules ⚪ (PENDING)
-*(Ref: docs/plan.md Modules 6, 7, 10)*
-- [ ] Profile information & job search preferences.
-- [ ] Multiple resume upload & association.
-- [ ] Resources & job board link organizer.
-- [ ] User settings (customize milestone sequence, follow-up waiting period).
+## Phase 4: Supporting Modules ✅ (COMPLETED)
+*(Ref: docs/plan.md Modules 6, 7, 8, 10)*
+
+### 4.1 Multi-Tenant User Data Isolation
+- [x] **Scoped Data Models ([src/models/](file:///d:/myprojects/employdnt/src/models/)):** Updated `Application`, `Category`, and `DailyProgress` schemas with indexed `userEmail` fields and compound unique indexes (`{ userEmail: 1, name: 1 }` and `{ userEmail: 1, categoryId: 1, date: 1 }`).
+- [x] **Scoped Services Layer:** Database queries across `application.service.ts`, `category.service.ts`, `progress.service.ts`, and `follow-up.service.ts` are strictly scoped to authenticated `session.user.email`.
+- [x] **Backward-Compatible Backfill:** Legacy unassigned records are automatically claimed by the active authenticated user on read to maintain seamless upgrades.
+- [x] **Mongoose Model Dev Cache Invalidation:** Implemented hot-reload cache busting in dev mode (`delete mongoose.models[Model]`) to prevent stale schemas in long-running `next dev` processes.
+
+### 4.2 Module 6: Profile & Resume Version Management
+- [x] **Extended User Profile ([src/models/user.model.ts](file:///d:/myprojects/employdnt/src/models/user.model.ts), [src/services/profile.service.ts](file:///d:/myprojects/employdnt/src/services/profile.service.ts)):** Added fields for headline, phone, location, bio, skills array, work arrangement preferences (Remote/Hybrid/On-site), target roles, and portfolio/social URLs.
+- [x] **Resume Model & Service ([src/models/resume.model.ts](file:///d:/myprojects/employdnt/src/models/resume.model.ts), [src/services/resume.service.ts](file:///d:/myprojects/employdnt/src/services/resume.service.ts)):**
+  - Support multiple resume versions (e.g. Frontend, Fullstack, DevOps) with document links, target roles, notes, and default flag.
+  - Auto-manages singular default resume per user.
+- [x] **APIs:**
+  - `GET /api/profile` & `PUT /api/profile` ([src/app/api/profile/route.ts](file:///d:/myprojects/employdnt/src/app/api/profile/route.ts))
+  - `GET /api/resumes` & `POST /api/resumes` ([src/app/api/resumes/route.ts](file:///d:/myprojects/employdnt/src/app/api/resumes/route.ts))
+  - `PATCH /api/resumes/[id]` & `DELETE /api/resumes/[id]` ([src/app/api/resumes/[id]/route.ts](file:///d:/myprojects/employdnt/src/app/api/resumes/[id]/route.ts))
+- [x] **Profile View ([src/app/(dashboard)/profile/page.tsx](file:///d:/myprojects/employdnt/src/app/(dashboard)/profile/page.tsx), [src/components/pages/profile/profile-view.tsx](file:///d:/myprojects/employdnt/src/components/pages/profile/profile-view.tsx)):** Comprehensive profile editor tab and resume version manager with add, default toggle, link launching, and delete actions.
+- [x] **Application Logging Integration ([src/components/shared/quick-add-modal.tsx](file:///d:/myprojects/employdnt/src/components/shared/quick-add-modal.tsx)):** Dropdown to select which resume version was used with each application.
+
+### 4.3 Module 7: Resource Library & Bookmark Organizer
+- [x] **Resource Model & Service ([src/models/resource.model.ts](file:///d:/myprojects/employdnt/src/models/resource.model.ts), [src/services/resource.service.ts](file:///d:/myprojects/employdnt/src/services/resource.service.ts)):**
+  - Bookmark categorized links across *Job Boards*, *Interview Prep*, *Learning*, *Resume Tools*, *Networking*, and *Other*.
+  - Pinning support, search filtering, tag queries, and direct URL launching.
+  - Pre-seeded starter resources automatically provided for new users.
+- [x] **APIs:**
+  - `GET /api/resources` & `POST /api/resources` ([src/app/api/resources/route.ts](file:///d:/myprojects/employdnt/src/app/api/resources/route.ts))
+  - `PATCH /api/resources/[id]` & `DELETE /api/resources/[id]` ([src/app/api/resources/[id]/route.ts](file:///d:/myprojects/employdnt/src/app/api/resources/[id]/route.ts))
+- [x] **Resource View ([src/app/(dashboard)/resources/page.tsx](file:///d:/myprojects/employdnt/src/app/(dashboard)/resources/page.tsx), [src/components/pages/resources/resources-view.tsx](file:///d:/myprojects/employdnt/src/components/pages/resources/resources-view.tsx)):** Search bar, category pill filters, pinned quick-access cards, and add-resource modal.
+
+### 4.4 Module 8 & Settings: Preferences & Cadence Controls
+- [x] **Preferences API ([src/app/api/user/preferences/route.ts](file:///d:/myprojects/employdnt/src/app/api/user/preferences/route.ts)):**
+  - Follow-up reminder cadence selector (3, 5, 7, 10, or 14 days).
+  - Configurable daily application target baseline (1–50 applications).
+  - In-app notification toggles for follow-up reminders and detected recruiter emails.
+- [x] **Unified Settings View ([src/app/(dashboard)/settings/page.tsx](file:///d:/myprojects/employdnt/src/app/(dashboard)/settings/page.tsx), [src/components/pages/settings/settings-view.tsx](file:///d:/myprojects/employdnt/src/components/pages/settings/settings-view.tsx)):**
+  - Follow-Up Cadence button group.
+  - Daily target baseline input and notification toggles.
+  - Integrated Gmail Recruitment Scanner connection status, manual sync button, and modal disconnect flow.
+
+### 4.5 Navigation & App Shell Updates
+- [x] **Navbar Links ([src/components/layout/navbar.tsx](file:///d:/myprojects/employdnt/src/components/layout/navbar.tsx)):** Added **Resources** and **Profile** to both desktop navigation bar and mobile drawer.
 
 ---
 
-## Phase 5: Polish & Final Touches ⚪ (PENDING)
+## Phase 5: Polish & Optimization 🟡 (NEXT UP)
 *(Ref: docs/plan.md Modules 9.4, 12)*
 - [ ] Accessibility review (WCAG compliance, screen reader compatibility).
 - [ ] Responsive pass for mobile viewports.
 - [ ] Error boundary handling & graceful offline fallbacks.
+- [ ] Final performance optimizations & production build audit.

@@ -6,12 +6,27 @@ A lightweight personal job-search assistant designed to keep applications organi
 
 ---
 
+## Features & Modules
+
+- **Today Dashboard (Module 1):** Progressive milestone goal bars (`10 -> 15 -> 20 -> 30 -> 40 -> 50`), lifetime counters, "Needs Attention" follow-up alerts, recent applications feed, and quick-add modal.
+- **Application Management (Module 2):** Full application CRUD, search, category & status filtering, multi-version resume tracking, notes, and chronological audit timelines.
+- **Follow-Up Assistant (Module 3):** Automated scheduling (+N days), 14-day upcoming queue, 3-tone customizable email draft generator, 1-click clipboard copy, and native `mailto:` launcher (zero automated sending).
+- **Google Recruitment Scanner (Module 4):** Read-only Gmail scanner identifying interview invites, offers, and rejections with smart confidence scoring and user-confirmed status transitions.
+- **Multi-Tenant User Isolation (Module 5 & 11):** Strict user-scoped isolation for all applications, categories, resumes, bookmarks, and daily progress.
+- **Profile & Resume Version Manager (Module 6):** Candidate profile editor and multi-resume manager (e.g. Frontend, Fullstack, DevOps) with target roles and default resume selection.
+- **Resource Library & Bookmarks (Module 7):** Curated directory of job boards, interview prep handbooks, learning platforms, and custom bookmarks with tagging and pinning.
+- **Preferences & Cadence Controls (Module 8):** Customizable follow-up cadence (3, 5, 7, 10, or 14 days), daily target baseline, and alert preferences.
+
+---
+
 ## Tech Stack
 
-- **Framework:** Next.js (App Router, React 19)
-- **Styling:** Tailwind CSS (v4)
+- **Framework:** Next.js 16 (App Router, React 19)
+- **Authentication:** Auth.js (NextAuth v5) + Google OAuth
 - **Database & ODM:** MongoDB with Mongoose
-- **Language:** TypeScript
+- **Styling:** Tailwind CSS (v4)
+- **Icons:** Lucide React
+- **Language:** TypeScript 5
 
 ---
 
@@ -23,8 +38,8 @@ This project adheres to a clean separation of concerns with a strict **"one file
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 │   ├── (auth)/           # Authentication routes (login, register)
-│   ├── (dashboard)/      # Main dashboard routes (today, applications, follow-up, settings)
-│   └── api/              # API endpoints / Route handlers
+│   ├── (dashboard)/      # Main dashboard routes (today, applications, follow-up, resources, profile, settings)
+│   └── api/              # Scoped API endpoints & Route handlers
 ├── components/           # React presentation & UI components
 │   ├── layout/           # App shell, Navbar, Footer
 │   ├── pages/            # Page-specific composite view components
@@ -44,7 +59,8 @@ src/
 ### Development Guidelines
 - **One File, One Logic:** Keep components, services, and models focused strictly on a single responsibility.
 - **Service Layer:** API routes (`/api/...`) and server actions should delegate business logic to dedicated functions in `src/services/`.
-- **Styling:** Use preconfigured Tailwind utility classes directly. Follow the white-and-green design identity (green for progress/primary actions, subtle accents for info and status).
+- **Client Date Isolation:** Zero server-time bias — all daily progress and follow-up schedules resolve using client local date `YYYY-MM-DD`.
+- **User Scoping:** All database queries are strictly scoped to the authenticated `session.user.email`.
 
 ---
 
@@ -54,7 +70,12 @@ src/
 Create a `.env.local` or `.env` file in the project root:
 
 ```env
-MONGODB_URI=mongodb://localhost:27017/employdnt
+MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<database>"
+AUTH_SECRET="your-generated-auth-secret"
+
+# Google OAuth & Gmail Integration
+AUTH_GOOGLE_ID="your-google-oauth-client-id.apps.googleusercontent.com"
+AUTH_GOOGLE_SECRET="your-google-oauth-client-secret"
 ```
 
 ### 2. Install Dependencies
@@ -68,3 +89,15 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## Verification & Quality
+
+```bash
+# Type check
+node ./node_modules/typescript/bin/tsc --noEmit
+
+# Lint check
+npm run lint
+```
