@@ -654,7 +654,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
             {currentStageIndex >= 1 && (
               <Card
                 className={`p-5 space-y-4 ${
-                  sowData || scopeDocUrl
+                  sowData || scopeDocUrl || currentStageIndex > 1
                     ? currentStage === "Scoping"
                       ? "border-emerald-500/20 bg-emerald-500/5"
                       : "border-[var(--border)] bg-[var(--surface)]"
@@ -663,14 +663,14 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
               >
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
                   <div className="flex items-center gap-2">
-                    {sowData || scopeDocUrl ? (
+                    {sowData || scopeDocUrl || currentStageIndex > 1 ? (
                       <FileCheck className="w-4 h-4 text-emerald-400" />
                     ) : (
                       <FileText className="w-4 h-4 text-amber-400" />
                     )}
                     <h3
                       className={`text-xs font-bold uppercase tracking-wider ${
-                        sowData || scopeDocUrl ? "text-emerald-400" : "text-amber-400"
+                        sowData || scopeDocUrl || currentStageIndex > 1 ? "text-emerald-400" : "text-amber-400"
                       }`}
                     >
                       2. Scoping Details &amp; SOW

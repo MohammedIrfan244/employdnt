@@ -178,4 +178,26 @@ export interface IFreelanceDashboardMetrics {
   activeProjects: number;
   upcomingDeadlinesCount: number;
   scopingAttentionCount: number;
+  todayOutreachCount?: number;
+  dailyTarget?: number;
+}
+
+export interface IClientDuplicateMatch {
+  _id: string;
+  companyName: string;
+  contactName: string;
+  email?: string;
+  website?: string;
+  mobile?: string;
+  currentStage: FreelanceStage;
+  outreachDate: string;
+  matchReasons: string[];
+}
+
+export interface IDuplicateCheckQuery {
+  companyName?: string;
+  contactName?: string;
+  email?: string;
+  website?: string;
+  mobile?: string;
 }

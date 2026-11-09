@@ -13,6 +13,7 @@ import {
   FreelanceStage,
   FREELANCE_STAGES,
 } from "@/types/freelance-client";
+import DailyOutreachJar from "@/components/freelance/dashboard/daily-outreach-jar";
 import {
   Users,
   Briefcase,
@@ -142,6 +143,13 @@ export default function FreelanceDashboardView({
           )}
         </div>
       </div>
+
+      {/* Daily Outreach Count Jar (Target 5, with Overflow support) */}
+      <DailyOutreachJar
+        todayCount={metrics.todayOutreachCount || 0}
+        target={metrics.dailyTarget || 5}
+        onOpenQuickAddLead={onOpenQuickAddLead}
+      />
 
       {/* Summary Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">

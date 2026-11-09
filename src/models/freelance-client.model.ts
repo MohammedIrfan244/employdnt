@@ -90,11 +90,14 @@ const FreelanceClientSchema = new Schema<IFreelanceClient>(
     scoping: {
       requirementsSummary: { type: String, trim: true },
       scopeDocUrl: { type: String, trim: true },
+      scopeDocFileName: { type: String, trim: true },
+      sowData: { type: Schema.Types.Mixed },
       budgetEstimate: { type: Number },
       currency: { type: String, default: "INR" },
     },
     contract: {
       contractDocUrl: { type: String, trim: true },
+      contractData: { type: Schema.Types.Mixed },
       agreedAmount: { type: Number },
       currency: { type: String, default: "INR" },
       functionalRequirements: { type: String, trim: true },
@@ -114,6 +117,7 @@ const FreelanceClientSchema = new Schema<IFreelanceClient>(
       productionUrl: { type: String, trim: true },
       deploymentDate: { type: String, trim: true },
       handoverNotes: { type: String, trim: true },
+      handoverData: { type: Schema.Types.Mixed },
     },
     postLaunch: {
       supportPeriodMonths: { type: Number },
