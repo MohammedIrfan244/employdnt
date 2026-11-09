@@ -1,13 +1,27 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Textarea from "@/components/ui/textarea";
-import { X, Building2, User, Globe, Mail, Phone, Calendar, Sparkles } from "lucide-react";
+import Badge from "@/components/ui/badge";
+import {
+  X,
+  Building2,
+  User,
+  Globe,
+  Mail,
+  Phone,
+  Calendar,
+  Sparkles,
+  AlertTriangle,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
 import { useClientDate } from "@/hooks/use-client-date";
-import { LeadSource } from "@/types/freelance-client";
+import { LeadSource, IClientDuplicateMatch } from "@/types/freelance-client";
 
 interface QuickAddLeadModalProps {
   isOpen: boolean;
@@ -47,11 +61,64 @@ export default function QuickAddLeadModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Previous contact / duplicate check state
+  const [duplicates, setDuplicates] = useState<IClientDuplicateMatch[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [dismissedWarning, setDismissedWarning] = useState(false);
+
   useEffect(() => {
     if (todayString && !outreachDate) {
       setOutreachDate(todayString);
     }
   }, [todayString, outreachDate]);
+
+  // Real-time debounced check if we have contacted this client before
+  useEffect(() => {
+    const trimmedComp = companyName.trim();
+    const trimmedContact = contactName.trim();
+    const trimmedEmail = email.trim();
+    const trimmedWeb = website.trim();
+    const trimmedMob = mobile.trim();
+
+    if (
+      trimmedComp.length < 2 &&
+      trimmedContact.length < 2 &&
+      trimmedEmail.length < 3 &&
+      trimmedWeb.length < 3 &&
+      trimmedMob.length < 7
+    ) {
+      setDuplicates([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingDuplicates(true);
+      try {
+        const params = new URLSearchParams();
+        if (trimmedComp) params.set("companyName", trimmedComp);
+        if (trimmedContact) params.set("contactName", trimmedContact);
+        if (trimmedEmail) params.set("email", trimmedEmail);
+        if (trimmedWeb) params.set("website", trimmedWeb);
+        if (trimmedMob) params.set("mobile", trimmedMob);
+
+        const res = await fetch(`/api/freelance/clients/check?${params.toString()}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setDuplicates(json.data);
+          // If fresh matches appear, re-show warning
+          if (json.data.length > 0) {
+            setDismissedWarning(false);
+          }
+        }
+      } catch {
+        // silent
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [companyName, contactName, email, website, mobile]);
 
   if (!isOpen) return null;
 
@@ -99,6 +166,8 @@ export default function QuickAddLeadModal({
       setWebsite("");
       setInitialNotes("");
       setStageDueDate("");
+      setDuplicates([]);
+      setDismissedWarning(false);
       onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -143,12 +212,88 @@ export default function QuickAddLeadModal({
             </div>
           )}
 
+          {/* Real-time Duplicate / Previously Contacted Alert Banner */}
+          {duplicates.length > 0 && !dismissedWarning && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5 text-xs animate-in fade-in duration-200">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="font-bold text-amber-300">
+                    Previously Contacted Client Found ({duplicates.length})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDismissedWarning(true)}
+                  className="text-[10px] text-amber-400/80 hover:text-amber-200 uppercase font-mono tracking-wider underline cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+
+              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+                Records in your CRM already match this business or contact. You can view the existing record or continue creating this lead:
+              </p>
+
+              <div className="space-y-2 pt-0.5 max-h-44 overflow-y-auto">
+                {duplicates.map((match) => (
+                  <div
+                    key={match._id}
+                    className="p-2.5 bg-zinc-950/70 border border-amber-500/20 rounded-lg flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white truncate">
+                          {match.companyName}
+                        </span>
+                        <Badge variant="interview" className="text-[9px] py-0 px-1.5">
+                          Stage: {match.currentStage}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-[var(--muted)] truncate">
+                        Contact: <span className="text-zinc-300">{match.contactName}</span>
+                        {match.outreachDate && ` • First outreach: ${match.outreachDate}`}
+                      </p>
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {match.matchReasons.map((r, i) => (
+                          <span
+                            key={i}
+                            className="text-[10px] text-amber-300/90 font-medium bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/20"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/freelance/clients/${match._id}`}
+                      target="_blank"
+                      className="shrink-0 text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 underline"
+                    >
+                      <span>View</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Company & Contact */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--foreground)] flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-[var(--accent-text)]" />
-                Company Name *
+              <label className="text-xs font-medium text-[var(--foreground)] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-[var(--accent-text)]" />
+                  Company Name *
+                </span>
+                {checkingDuplicates && (
+                  <span className="text-[10px] text-[var(--muted)] flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
+                    Checking...
+                  </span>
+                )}
               </label>
               <Input
                 placeholder="e.g. Acme Studio"

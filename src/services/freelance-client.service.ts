@@ -4,6 +4,8 @@ import {
   IFreelanceClient,
   IFreelanceDashboardMetrics,
   LeadSource,
+  IClientDuplicateMatch,
+  IDuplicateCheckQuery,
 } from "@/types/freelance-client";
 
 function normalizeEmail(email: string): string {
@@ -236,11 +238,18 @@ export async function getFreelanceDashboardMetrics(
     return diffDays >= 7;
   }).length;
 
+  // Count Jar: Leads reached out today
+  const todayOutreachCount = allClients.filter(
+    (c) => c.outreachDate === clientToday
+  ).length;
+
   return {
     totalLeads,
     activeProjects,
     upcomingDeadlinesCount,
     scopingAttentionCount,
+    todayOutreachCount,
+    dailyTarget: 5,
   };
 }
 
@@ -266,4 +275,111 @@ export async function getScopingAttentionLeads(
   });
 
   return JSON.parse(JSON.stringify(attentionLeads));
+}
+
+function cleanDomain(url?: string): string {
+  if (!url) return "";
+  return url
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("/")[0]
+    .trim();
+}
+
+function cleanPhone(phone?: string): string {
+  if (!phone) return "";
+  return phone.replace(/\D/g, "");
+}
+
+export async function checkDuplicateFreelanceClient(
+  userEmail: string,
+  query: IDuplicateCheckQuery
+): Promise<IClientDuplicateMatch[]> {
+  await connectDB();
+  const email = normalizeEmail(userEmail);
+
+  const compQuery = query.companyName?.trim().toLowerCase() || "";
+  const contactQuery = query.contactName?.trim().toLowerCase() || "";
+  const emailQuery = query.email?.trim().toLowerCase() || "";
+  const domainQuery = cleanDomain(query.website);
+  const phoneQuery = cleanPhone(query.mobile);
+
+  if (!compQuery && !contactQuery && !emailQuery && !domainQuery && !phoneQuery) {
+    return [];
+  }
+
+  const allClients = await FreelanceClient.find({
+    $or: [{ userEmail: email }, { userEmail }],
+    isArchived: { $ne: true },
+  }).lean();
+
+  const matches: IClientDuplicateMatch[] = [];
+
+  for (const c of allClients) {
+    const reasons: string[] = [];
+
+    // 1. Email exact match (strongest)
+    if (emailQuery && c.email) {
+      if (c.email.toLowerCase().trim() === emailQuery) {
+        reasons.push(`Exact email match: ${c.email}`);
+      }
+    }
+
+    // 2. Company name match
+    if (compQuery && c.companyName) {
+      const cComp = c.companyName.toLowerCase().trim();
+      if (cComp === compQuery) {
+        reasons.push(`Same company name: "${c.companyName}"`);
+      } else if (
+        (compQuery.length >= 4 && cComp.includes(compQuery)) ||
+        (cComp.length >= 4 && compQuery.includes(cComp))
+      ) {
+        reasons.push(`Similar company name: "${c.companyName}"`);
+      }
+    }
+
+    // 3. Website domain match
+    if (domainQuery && c.website) {
+      const cDomain = cleanDomain(c.website);
+      if (cDomain && (cDomain === domainQuery || cDomain.includes(domainQuery) || domainQuery.includes(cDomain))) {
+        reasons.push(`Website domain match: ${cDomain}`);
+      }
+    }
+
+    // 4. Contact person match
+    if (contactQuery && c.contactName) {
+      const cContact = c.contactName.toLowerCase().trim();
+      if (cContact === contactQuery) {
+        reasons.push(`Same contact person: "${c.contactName}"`);
+      }
+    }
+
+    // 5. Phone match (if at least 7 digits)
+    if (phoneQuery && phoneQuery.length >= 7 && c.mobile) {
+      const cPhone = cleanPhone(c.mobile);
+      if (cPhone && cPhone.includes(phoneQuery)) {
+        reasons.push(`Phone number match: ${c.mobile}`);
+      }
+    }
+
+    if (reasons.length > 0) {
+      matches.push({
+        _id: c._id.toString(),
+        companyName: c.companyName,
+        contactName: c.contactName,
+        email: c.email,
+        website: c.website,
+        mobile: c.mobile,
+        currentStage: c.currentStage,
+        outreachDate: c.outreachDate,
+        matchReasons: reasons,
+      });
+    }
+  }
+
+  // Sort: most match reasons first
+  matches.sort((a, b) => b.matchReasons.length - a.matchReasons.length);
+
+  return matches;
 }
